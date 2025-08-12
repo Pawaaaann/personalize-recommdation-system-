@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  edurec-api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: edurec-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../data:/app/data
+      - ../src:/app/src
+    environment:
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - edurec-network
+
+  # Optional: Add a database service for production
+  # postgres:
+  #   image: postgres:13
+  #   container_name: edurec-postgres
+  #   environment:
+  #     POSTGRES_DB: edurec
+  #     POSTGRES_USER: edurec_user
+  #     POSTGRES_PASSWORD: edurec_password
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+  #   networks:
+  #     - edurec-network
+
+  # Optional: Add Redis for caching
+  # redis:
+  #   image: redis:6-alpine
+  #   container_name: edurec-redis
+  #   ports:
+  #     - "6379:6379"
+  #   networks:
+  #     - edurec-network
+
+networks:
+  edurec-network:
+    driver: bridge
+
+# volumes:
+#   postgres_data: 
