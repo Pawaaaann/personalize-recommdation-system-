@@ -1,322 +1,267 @@
+#!/usr/bin/env python3
 """
-Main FastAPI application for EduRec.
+FastAPI backend for the educational recommendation system.
 """
 
-from fastapi import FastAPI, HTTPException, Depends
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+import json
+import os
+from datetime import datetime
 from typing import List, Dict, Any, Optional
-import logging
-import pandas as pd
 from pathlib import Path
 
-from ..data.data_loader import DataLoader
-from ..models import BaselineRecommender, ALSRecommender, HybridRecommender
+import pandas as pd
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from ..models.hybrid import hybrid_recommend
+from ..models.als_recommender import ALSRecommender
+from ..models.baseline import BaselineRecommender
+from ..data.data_loader import DataLoader
 
 # Initialize FastAPI app
 app = FastAPI(
-    title="EduRec API",
-    description="Education Recommendation System API",
-    version="0.1.0",
-    docs_url="/docs",
-    redoc_url="/redoc"
+    title="Educational Recommendation System API",
+    description="API for personalized course recommendations",
+    version="1.0.0"
 )
 
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Pydantic models for API requests/responses
-class RecommendationRequest(BaseModel):
-    user_id: str = Field(..., description="ID of the user to get recommendations for")
-    n_recommendations: int = Field(10, ge=1, le=100, description="Number of recommendations to return")
-    model_type: str = Field("hybrid", description="Type of recommender to use")
-    user_interests: Optional[List[str]] = Field(None, description="User interests for content-based filtering")
+# Pydantic models
+class InteractionEvent(BaseModel):
+    student_id: str = Field(..., description="Student identifier")
+    course_id: str = Field(..., description="Course identifier")
+    event_type: str = Field(..., description="Type of interaction (view, enroll, complete)")
+    timestamp: Optional[datetime] = Field(default_factory=datetime.now, description="Event timestamp")
 
 class RecommendationResponse(BaseModel):
-    user_id: str
-    recommendations: List[Dict[str, Any]]
-    model_info: Dict[str, Any]
-    total_count: int
+    course_id: str = Field(..., description="Course identifier")
+    score: float = Field(..., description="Recommendation score")
+    explanation: List[str] = Field(..., description="List of explanation reasons")
 
-class ModelInfoResponse(BaseModel):
-    model_type: str
-    is_fitted: bool
-    model_info: Dict[str, Any]
+class CourseMetadata(BaseModel):
+    course_id: str = Field(..., description="Course identifier")
+    title: str = Field(..., description="Course title")
+    description: Optional[str] = Field(None, description="Course description")
+    skill_tags: Optional[str] = Field(None, description="Comma-separated skill tags")
+    difficulty: Optional[str] = Field(None, description="Course difficulty level")
+    duration: Optional[str] = Field(None, description="Course duration")
 
-class DataSummaryResponse(BaseModel):
-    users: Dict[str, Any]
-    courses: Dict[str, Any]
-    interactions: Dict[str, Any]
+class HealthResponse(BaseModel):
+    status: str = Field(..., description="Service status")
+    timestamp: datetime = Field(..., description="Current timestamp")
+    models_loaded: bool = Field(..., description="Whether recommendation models are loaded")
 
 # Global variables for models and data
-data_loader = None
-models = {}
-current_model = None
+models_loaded = False
+als_model: Optional[ALSRecommender] = None
+baseline_model: Optional[BaselineRecommender] = None
+courses_df: Optional[pd.DataFrame] = None
+interactions_df: Optional[pd.DataFrame] = None
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize the application on startup."""
-    global data_loader, models
+# Paths for data and models
+DATA_DIR = Path("../../data")
+MODELS_DIR = Path("../../models")
+INTERACTIONS_QUEUE_FILE = Path("../../data/interactions_queue.jsonl")
+
+def load_models_and_data():
+    """Load pre-trained models and data."""
+    global models_loaded, als_model, baseline_model, courses_df, interactions_df
     
-    logger.info("Starting EduRec API...")
-    
-    # Initialize data loader
-    data_dir = Path("data")
-    if data_dir.exists():
-        data_loader = DataLoader(str(data_dir))
-        try:
-            data_loader.load_all_data()
-            logger.info("Data loaded successfully")
-        except Exception as e:
-            logger.warning(f"Could not load existing data: {e}")
-    else:
-        logger.info("No existing data found, will use sample data when available")
+    try:
+        # Load data
         data_loader = DataLoader()
+        courses_df = data_loader.load_courses_data()
+        interactions_df = data_loader.load_interactions_data()
+        
+        # Load ALS model if available
+        als_model_path = MODELS_DIR / "als_model.pkl"
+        if als_model_path.exists():
+            als_model = ALSRecommender()
+            als_model.load(str(als_model_path))
+            print(f"Loaded ALS model from {als_model_path}")
+        else:
+            print(f"ALS model not found at {als_model_path}")
+        
+        # Load baseline model
+        baseline_model = BaselineRecommender(strategy="hybrid")
+        baseline_model.fit(interactions_df, courses_df)
+        print("Loaded and fitted baseline model")
+        
+        models_loaded = True
+        print("Models and data loaded successfully")
+        
+    except Exception as e:
+        print(f"Error loading models and data: {e}")
+        models_loaded = False
 
-@app.get("/")
-async def root():
-    """Root endpoint with API information."""
-    return {
-        "message": "Welcome to EduRec API",
-        "version": "0.1.0",
-        "docs": "/docs",
-        "endpoints": [
-            "/health",
-            "/data/summary",
-            "/models",
-            "/recommend",
-            "/models/{model_type}/info"
-        ]
-    }
+def store_interaction(event: InteractionEvent):
+    """Store interaction event to local queue."""
+    try:
+        # Ensure directory exists
+        INTERACTIONS_QUEUE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Append to JSONL file
+        with open(INTERACTIONS_QUEUE_FILE, "a", encoding="utf-8") as f:
+            event_dict = event.model_dump()
+            if event_dict["timestamp"]:
+                event_dict["timestamp"] = event_dict["timestamp"].isoformat()
+            f.write(json.dumps(event_dict) + "\n")
+        
+        print(f"Stored interaction: {event.student_id} -> {event.course_id} ({event.event_type})")
+        
+    except Exception as e:
+        print(f"Error storing interaction: {e}")
+        raise HTTPException(status_code=500, detail="Failed to store interaction")
 
-@app.get("/health")
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for loading models and data."""
+    load_models_and_data()
+    yield
+
+# Initialize FastAPI app with lifespan
+app = FastAPI(
+    title="Educational Recommendation System API",
+    description="API for personalized course recommendations",
+    version="1.0.0",
+    lifespan=lifespan
+)
+
+@app.get("/health", response_model=HealthResponse)
 async def health_check():
     """Health check endpoint."""
-    return {"status": "healthy", "timestamp": pd.Timestamp.now().isoformat()}
-
-@app.get("/data/summary", response_model=DataSummaryResponse)
-async def get_data_summary():
-    """Get summary of loaded data."""
-    if data_loader is None:
-        raise HTTPException(status_code=500, detail="Data loader not initialized")
-    
-    try:
-        summary = data_loader.get_data_summary()
-        return DataSummaryResponse(**summary)
-    except Exception as e:
-        logger.error(f"Error getting data summary: {e}")
-        raise HTTPException(status_code=500, detail=f"Error getting data summary: {str(e)}")
-
-@app.post("/models/train")
-async def train_models():
-    """Train all recommendation models."""
-    global models, current_model
-    
-    if data_loader is None:
-        raise HTTPException(status_code=500, detail="Data loader not initialized")
-    
-    try:
-        # Load data if not already loaded
-        data = data_loader.load_all_data()
-        
-        if data["interactions"].empty:
-            raise HTTPException(status_code=400, detail="No interaction data available")
-        
-        logger.info("Training models...")
-        
-        # Train baseline model
-        baseline_model = BaselineRecommender(strategy="popularity")
-        baseline_model.fit(data["interactions"], data["courses"], data["users"])
-        models["baseline"] = baseline_model
-        
-        # Train ALS model
-        als_model = ALSRecommender()
-        als_model.fit(data["interactions"])
-        models["als"] = als_model
-        
-        # Train hybrid model
-        hybrid_model = HybridRecommender()
-        hybrid_model.fit(data["interactions"], data["courses"], data["users"])
-        models["hybrid"] = hybrid_model
-        
-        # Set hybrid as default
-        current_model = "hybrid"
-        
-        logger.info("All models trained successfully")
-        
-        return {
-            "message": "Models trained successfully",
-            "trained_models": list(models.keys()),
-            "current_model": current_model
-        }
-        
-    except Exception as e:
-        logger.error(f"Error training models: {e}")
-        raise HTTPException(status_code=500, detail=f"Error training models: {str(e)}")
-
-@app.get("/models")
-async def list_models():
-    """List available models and their status."""
-    global models, current_model
-    
-    model_status = {}
-    for name, model in models.items():
-        model_status[name] = {
-            "is_fitted": model.is_fitted,
-            "type": model.__class__.__name__,
-            "name": model.name
-        }
-    
-    return {
-        "available_models": list(models.keys()),
-        "current_model": current_model,
-        "model_status": model_status
-    }
-
-@app.get("/models/{model_type}/info", response_model=ModelInfoResponse)
-async def get_model_info(model_type: str):
-    """Get information about a specific model."""
-    global models
-    
-    if model_type not in models:
-        raise HTTPException(status_code=404, detail=f"Model {model_type} not found")
-    
-    model = models[model_type]
-    return ModelInfoResponse(
-        model_type=model_type,
-        is_fitted=model.is_fitted,
-        model_info=model.get_model_info()
+    return HealthResponse(
+        status="healthy",
+        timestamp=datetime.now(),
+        models_loaded=models_loaded
     )
 
-@app.post("/recommend", response_model=RecommendationResponse)
-async def get_recommendations(request: RecommendationRequest):
-    """Get course recommendations for a user."""
-    global models, current_model
-    
-    # Determine which model to use
-    model_type = request.model_type if request.model_type in models else current_model
-    
-    if model_type is None:
-        raise HTTPException(status_code=400, detail="No models available. Please train models first.")
-    
-    if model_type not in models:
-        raise HTTPException(status_code=404, detail=f"Model {model_type} not found")
-    
-    model = models[model_type]
-    
-    if not model.is_fitted:
-        raise HTTPException(status_code=400, detail=f"Model {model_type} is not fitted")
+@app.get("/recommend/{student_id}", response_model=List[RecommendationResponse])
+async def get_recommendations(
+    student_id: str,
+    k: int = Query(10, ge=1, le=50, description="Number of recommendations")
+):
+    """Get personalized course recommendations for a student."""
+    if not models_loaded:
+        raise HTTPException(status_code=503, detail="Models not loaded")
     
     try:
-        # Get recommendations
-        recommendations = model.recommend(
-            user_id=request.user_id,
-            n_recommendations=request.n_recommendations,
-            user_interests=request.user_interests
+        # Get recommendations using hybrid approach
+        recommendations = hybrid_recommend(
+            user_id=student_id,
+            N=k,
+            als_model=als_model,
+            baseline_model=baseline_model,
+            courses_df=courses_df,
+            interactions_df=interactions_df
         )
         
-        return RecommendationResponse(
-            user_id=request.user_id,
-            recommendations=recommendations,
-            model_info=model.get_model_info(),
-            total_count=len(recommendations)
+        # Convert to response format
+        response = []
+        for rec in recommendations:
+            response.append(RecommendationResponse(
+                course_id=rec["item_id"],
+                score=round(rec["score"], 4),
+                explanation=rec.get("explanations", [])
+            ))
+        
+        return response
+        
+    except Exception as e:
+        print(f"Error getting recommendations for {student_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate recommendations")
+
+@app.get("/course/{course_id}", response_model=CourseMetadata)
+async def get_course_metadata(course_id: str):
+    """Get metadata for a specific course."""
+    if courses_df is None:
+        raise HTTPException(status_code=503, detail="Course data not loaded")
+    
+    try:
+        course_data = courses_df[courses_df["course_id"] == course_id]
+        if course_data.empty:
+            raise HTTPException(status_code=404, detail="Course not found")
+        
+        course_row = course_data.iloc[0]
+        return CourseMetadata(
+            course_id=course_row["course_id"],
+            title=course_row["title"],
+            description=course_row.get("description"),
+            skill_tags=course_row.get("skill_tags"),
+            difficulty=course_row.get("difficulty"),
+            duration=course_row.get("duration")
         )
         
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error getting recommendations: {e}")
-        raise HTTPException(status_code=500, detail=f"Error getting recommendations: {str(e)}")
+        print(f"Error getting course metadata for {course_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve course metadata")
 
-@app.get("/recommend/{user_id}")
-async def get_recommendations_simple(
-    user_id: str,
-    n_recommendations: int = 10,
-    model_type: str = None
-):
-    """Simple endpoint for getting recommendations."""
-    request = RecommendationRequest(
-        user_id=user_id,
-        n_recommendations=n_recommendations,
-        model_type=model_type or "hybrid"
-    )
-    return await get_recommendations(request)
-
-@app.get("/courses/{course_id}/similar")
-async def get_similar_courses(
-    course_id: str,
-    n_similar: int = 10,
-    model_type: str = "als"
-):
-    """Get similar courses to a given course."""
-    global models
-    
-    if model_type not in models:
-        raise HTTPException(status_code=404, detail=f"Model {model_type} not found")
-    
-    model = models[model_type]
-    
-    if not model.is_fitted:
-        raise HTTPException(status_code=400, detail=f"Model {model_type} is not fitted")
-    
+@app.post("/interactions")
+async def record_interaction(event: InteractionEvent):
+    """Record a new interaction event."""
     try:
-        if hasattr(model, 'get_similar_items'):
-            similar_items = model.get_similar_items(course_id, n_similar)
-            return {
-                "course_id": course_id,
-                "similar_courses": similar_items,
-                "model_type": model_type
-            }
-        else:
-            raise HTTPException(status_code=400, detail=f"Model {model_type} does not support similar items")
-            
+        # Validate event type
+        valid_event_types = ["view", "enroll", "complete", "rate", "like"]
+        if event.event_type not in valid_event_types:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid event_type. Must be one of: {valid_event_types}"
+            )
+        
+        # Store interaction
+        store_interaction(event)
+        
+        return {"message": "Interaction recorded successfully", "event": event.model_dump()}
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error getting similar courses: {e}")
-        raise HTTPException(status_code=500, detail=f"Error getting similar courses: {str(e)}")
+        print(f"Error recording interaction: {e}")
+        raise HTTPException(status_code=500, detail="Failed to record interaction")
 
-@app.get("/users/{user_id}/profile")
-async def get_user_profile(user_id: str):
-    """Get user profile and interaction history."""
-    if data_loader is None:
-        raise HTTPException(status_code=500, detail="Data loader not initialized")
-    
+@app.get("/interactions/queue")
+async def get_interactions_queue():
+    """Get all stored interactions (for debugging/admin purposes)."""
     try:
-        # Get user data
-        users_df = data_loader.users_df
-        interactions_df = data_loader.interactions_df
+        if not INTERACTIONS_QUEUE_FILE.exists():
+            return {"interactions": [], "count": 0}
         
-        if users_df is None or users_df.empty:
-            raise HTTPException(status_code=404, detail="No user data available")
+        interactions = []
+        with open(INTERACTIONS_QUEUE_FILE, "r", encoding="utf-8") as f:
+            for line in f:
+                if line.strip():
+                    interactions.append(json.loads(line))
         
-        user_data = users_df[users_df['user_id'] == user_id]
-        if user_data.empty:
-            raise HTTPException(status_code=404, detail=f"User {user_id} not found")
-        
-        # Get user interactions
-        user_interactions = []
-        if interactions_df is not None and not interactions_df.empty:
-            user_interactions = interactions_df[
-                interactions_df['user_id'] == user_id
-            ].to_dict('records')
-        
-        return {
-            "user_id": user_id,
-            "profile": user_data.iloc[0].to_dict(),
-            "interactions": user_interactions,
-            "interaction_count": len(user_interactions)
-        }
+        return {"interactions": interactions, "count": len(interactions)}
         
     except Exception as e:
-        logger.error(f"Error getting user profile: {e}")
-        raise HTTPException(status_code=500, detail=f"Error getting user profile: {str(e)}")
+        print(f"Error reading interactions queue: {e}")
+        raise HTTPException(status_code=500, detail="Failed to read interactions queue")
+
+@app.delete("/interactions/queue")
+async def clear_interactions_queue():
+    """Clear the interactions queue (for debugging/admin purposes)."""
+    try:
+        if INTERACTIONS_QUEUE_FILE.exists():
+            INTERACTIONS_QUEUE_FILE.unlink()
+        return {"message": "Interactions queue cleared successfully"}
+        
+    except Exception as e:
+        print(f"Error clearing interactions queue: {e}")
+        raise HTTPException(status_code=500, detail="Failed to clear interactions queue")
 
 if __name__ == "__main__":
     import uvicorn
