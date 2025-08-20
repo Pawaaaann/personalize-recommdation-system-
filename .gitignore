@@ -162,17 +162,15 @@ cython_debug/
 #  *.iws
 
 # EduRec specific
-data/
-*.csv
-*.parquet
-*.h5
-*.pkl
+# Keep data directory but ignore large files
+data/*.parquet
+data/*.h5
+data/*.pkl
 
-# Model files
-models/
-*.joblib
-*.pkl
-*.h5
+# Model files - keep directory structure
+models/*.joblib
+models/*.pkl
+models/*.h5
 
 # Logs
 logs/
