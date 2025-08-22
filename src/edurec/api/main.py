@@ -63,6 +63,13 @@ class InteractionEvent(BaseModel):
     event_type: str = Field(..., description="Type of interaction (view, enroll, complete)")
     timestamp: Optional[datetime] = Field(default_factory=datetime.now, description="Event timestamp")
 
+class InterestBasedRecommendationRequest(BaseModel):
+    interests: List[str] = Field(..., description="List of user interests")
+    domain: Optional[str] = Field(None, description="User's selected domain")
+    subdomain: Optional[str] = Field(None, description="User's selected subdomain")
+    experience_level: Optional[str] = Field(None, description="User's experience level")
+    n_recommendations: int = Field(5, ge=4, le=20, description="Number of recommendations (minimum 4)")
+
 class RecommendationResponse(BaseModel):
     course_id: str = Field(..., description="Course identifier")
     score: float = Field(..., description="Recommendation score")
@@ -118,6 +125,16 @@ def load_models_and_data():
         courses_df = data_loader.load_courses()
         interactions_df = data_loader.load_interactions()
         
+        # Debug logging for data loading
+        print(f"Data loading debug:")
+        print(f"- courses_df type: {type(courses_df)}")
+        print(f"- courses_df shape: {courses_df.shape if courses_df is not None else 'None'}")
+        if courses_df is not None:
+            print(f"- courses_df columns: {courses_df.columns.tolist()}")
+            print(f"- First 5 course IDs: {courses_df['course_id'].head(5).tolist()}")
+            print(f"- Last 5 course IDs: {courses_df['course_id'].tail(5).tolist()}")
+            print(f"- Course ID 499 exists: {499 in courses_df['course_id'].values}")
+        
         # Update system metrics
         if courses_df is not None:
             metrics_collector.set_total_courses(len(courses_df))
@@ -151,6 +168,8 @@ def load_models_and_data():
         
     except Exception as e:
         print(f"Error loading models and data: {e}")
+        import traceback
+        traceback.print_exc()
         models_loaded = False
 
 def store_interaction(event: InteractionEvent):
@@ -246,6 +265,204 @@ async def get_recommendations(
         print(f"Error getting recommendations for {student_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to generate recommendations")
 
+@app.post("/recommendations/interest-based", response_model=List[RecommendationResponse])
+async def get_interest_based_recommendations(request: InterestBasedRecommendationRequest):
+    """Get personalized course recommendations based on user interests."""
+    if not models_loaded:
+        raise HTTPException(status_code=503, detail="Models not loaded")
+    
+    try:
+        # Ensure minimum of 4 recommendations
+        n_recs = max(4, request.n_recommendations)
+        
+        # Use baseline model with content-based strategy for interest-based recommendations
+        if baseline_model is None:
+            raise HTTPException(status_code=503, detail="Baseline model not loaded")
+        
+        all_recommendations = []
+        seen_courses = set()
+        
+        # Strategy 1: Try content-based filtering with user interests
+        try:
+            print(f"Attempting content-based recommendations with interests: {request.interests}")
+            
+            # Import the content-based recommender directly
+            from ..models.baseline import content_based_recommender
+            
+            # Use content-based recommender directly with user interests
+            query_text = " ".join(request.interests)
+            content_course_ids = content_based_recommender(
+                courses_df, query_text=query_text, top_n=n_recs * 3
+            )
+            
+            print(f"Content-based recommender returned {len(content_course_ids)} course IDs")
+            
+            # Convert course IDs to recommendation format
+            for i, course_id in enumerate(content_course_ids):
+                if course_id not in seen_courses and len(all_recommendations) < n_recs:
+                    # Calculate score based on position (higher position = higher score)
+                    score = 1.0 - (i / len(content_course_ids))
+                    
+                    content_rec = {
+                        "item_id": course_id,
+                        "score": score,
+                        "explanations": ["Based on your interests", "Content-based match"]
+                    }
+                    all_recommendations.append(content_rec)
+                    seen_courses.add(course_id)
+                    
+        except Exception as e:
+            print(f"Content-based recommendations failed: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        # Strategy 2: If we still need more, try popularity-based recommendations
+        if len(all_recommendations) < n_recs:
+            try:
+                print(f"Attempting popularity-based recommendations to get {n_recs - len(all_recommendations)} more")
+                
+                # Import the popularity recommender directly
+                from ..models.baseline import popularity_recommender
+                
+                # Use popularity recommender directly
+                pop_course_ids = popularity_recommender(interactions_df, n_recs * 2)
+                print(f"Popularity-based recommender returned {len(pop_course_ids)} course IDs")
+                
+                # Add unique popularity-based recommendations
+                for i, course_id in enumerate(pop_course_ids):
+                    if course_id not in seen_courses and len(all_recommendations) < n_recs:
+                        # Calculate score based on popularity position
+                        score = 1.0 - (i / len(pop_course_ids))
+                        
+                        pop_rec = {
+                            "item_id": course_id,
+                            "score": score,
+                            "explanations": ["Popular course", "Widely taken by students"]
+                        }
+                        all_recommendations.append(pop_rec)
+                        seen_courses.add(course_id)
+                        
+            except Exception as e:
+                print(f"Popularity-based recommendations failed: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        # Strategy 3: If we still don't have enough, get random courses from the dataset
+        if len(all_recommendations) < n_recs:
+            try:
+                print(f"Attempting to get {n_recs - len(all_recommendations)} random courses from dataset")
+                # Get random courses from the dataset
+                available_courses = courses_df[~courses_df['course_id'].isin(seen_courses)]
+                if len(available_courses) > 0:
+                    sample_size = min(n_recs - len(all_recommendations), len(available_courses))
+                    sample_courses = available_courses.sample(sample_size)
+                    
+                    for _, course_row in sample_courses.iterrows():
+                        if len(all_recommendations) < n_recs:
+                            synthetic_rec = {
+                                "item_id": course_row['course_id'],
+                                "score": 0.5,  # Default score for random recommendations
+                                "explanations": ["Course from your field", "Available in our catalog"]
+                            }
+                            all_recommendations.append(synthetic_rec)
+                            seen_courses.add(course_row['course_id'])
+                    
+                    print(f"Added {len(sample_courses)} random courses from dataset")
+            except Exception as e:
+                print(f"Random course sampling failed: {e}")
+        
+        # Strategy 4: Ultimate fallback - create generic recommendations only if we have less than 4
+        if len(all_recommendations) < 4:
+            print(f"Using generic fallback for {4 - len(all_recommendations)} recommendations")
+            generic_courses = [
+                {
+                    "item_id": "generic_1",
+                    "score": 0.7,
+                    "explanations": ["Foundation course for beginners", "Essential skills development"]
+                },
+                {
+                    "item_id": "generic_2", 
+                    "score": 0.6,
+                    "explanations": ["Popular starting point", "Industry standard course"]
+                },
+                {
+                    "item_id": "generic_3",
+                    "score": 0.5,
+                    "explanations": ["Recommended for your level", "Good introduction to the field"]
+                },
+                {
+                    "item_id": "generic_4",
+                    "score": 0.4,
+                    "explanations": ["Widely taken course", "Builds fundamental knowledge"]
+                }
+            ]
+            
+            for rec in generic_courses:
+                if len(all_recommendations) < 4:
+                    all_recommendations.append(rec)
+        
+        # Ensure we have exactly the requested number of recommendations
+        final_recommendations = all_recommendations[:n_recs]
+        
+        print(f"Final recommendations breakdown:")
+        print(f"- Total generated: {len(all_recommendations)}")
+        print(f"- Final count: {len(final_recommendations)}")
+        print(f"- Real course IDs: {[r['item_id'] for r in final_recommendations if not str(r['item_id']).startswith('generic_')]}")
+        print(f"- Generic fallbacks: {[r['item_id'] for r in final_recommendations if str(r['item_id']).startswith('generic_')]}")
+        
+        # Convert to response format
+        response = []
+        for rec in final_recommendations:
+            response.append(RecommendationResponse(
+                course_id=str(rec["item_id"]),
+                score=round(rec["score"], 4),
+                explanation=rec.get("explanations", ["Based on your interests", "Popular in your field"])
+            ))
+        
+        # Record recommendation metrics
+        metrics_collector.record_recommendation(
+            algorithm="interest_based",
+            user_id="interest_based_user",
+            count=len(response)
+        )
+        
+        # Record recommendation scores
+        for rec in response:
+            metrics_collector.record_recommendation_score(
+                algorithm="interest_based",
+                score=rec.score
+            )
+        
+        print(f"Generated {len(response)} interest-based recommendations")
+        return response
+        
+    except Exception as e:
+        print(f"Error getting interest-based recommendations: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate interest-based recommendations")
+
+@app.get("/debug/recommendations")
+async def debug_recommendations():
+    """Debug endpoint to check recommendation system status."""
+    try:
+        debug_info = {
+            "models_loaded": models_loaded,
+            "baseline_model_available": baseline_model is not None,
+            "courses_df_available": courses_df is not None,
+            "interactions_df_available": interactions_df is not None,
+            "total_courses": len(courses_df) if courses_df is not None else 0,
+            "total_interactions": len(interactions_df) if interactions_df is not None else 0,
+            "sample_courses": []
+        }
+        
+        if courses_df is not None and len(courses_df) > 0:
+            sample_courses = courses_df.head(3)[['course_id', 'title', 'skill_tags']].to_dict('records')
+            debug_info["sample_courses"] = sample_courses
+        
+        return debug_info
+        
+    except Exception as e:
+        return {"error": str(e)}
+
 @app.get("/course/{course_id}", response_model=CourseMetadata)
 async def get_course_metadata(course_id: str):
     """Get metadata for a specific course."""
@@ -253,13 +470,26 @@ async def get_course_metadata(course_id: str):
         raise HTTPException(status_code=503, detail="Course data not loaded")
     
     try:
-        course_data = courses_df[courses_df["course_id"] == course_id]
+        # Convert course_id to int for comparison with DataFrame
+        try:
+            course_id_int = int(course_id)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid course ID format")
+        
+        # Debug logging
+        print(f"Looking for course ID: {course_id_int}")
+        print(f"Available course IDs (first 10): {courses_df['course_id'].head(10).tolist()}")
+        print(f"Available course IDs (last 10): {courses_df['course_id'].tail(10).tolist()}")
+        print(f"Course ID {course_id_int} exists: {course_id_int in courses_df['course_id'].values}")
+        
+        # Look up the course by integer ID
+        course_data = courses_df[courses_df["course_id"] == course_id_int]
         if course_data.empty:
             raise HTTPException(status_code=404, detail="Course not found")
         
         course_row = course_data.iloc[0]
         return CourseMetadata(
-            course_id=course_row["course_id"],
+            course_id=str(course_row["course_id"]),  # Convert back to string for response
             title=course_row["title"],
             description=course_row.get("description"),
             skill_tags=course_row.get("skill_tags"),

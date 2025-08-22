@@ -109,8 +109,12 @@ def content_based_recommender(
         # Get top N similar courses
         top_indices = np.argsort(similarities)[::-1][:top_n]
         
-        # Return list of course_ids
-        recommended_course_ids = courses_df.iloc[top_indices]['course_id'].tolist()
+        # Return list of course_ids - use the actual course_id values, not DataFrame indices
+        recommended_course_ids = []
+        for idx in top_indices:
+            if similarities[idx] > 0:  # Only include courses with positive similarity
+                course_id = courses_df.iloc[idx]['course_id']
+                recommended_course_ids.append(course_id)
         
         return recommended_course_ids
         

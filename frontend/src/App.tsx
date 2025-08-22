@@ -1,88 +1,213 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Login } from './components/Login';
 import { Dashboard } from './components/Dashboard';
-import { api } from './services/api';
+import { InterestAssessment } from './components/InterestAssessment';
+import { CareerRecommendations } from './components/CareerRecommendations';
+import { InterestBasedRecommendations } from './components/InterestBasedRecommendations';
+import { LearningPath } from './components/LearningPath';
+import { UserAssessment } from './components/InterestAssessment';
 
-function App() {
-  const [studentId, setStudentId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isHealthy, setIsHealthy] = useState<boolean | null>(null);
+type AppView = 'login' | 'assessment' | 'careers' | 'course-recommendations' | 'learning-path' | 'dashboard';
 
-  // Check API health on mount
+function AppContent() {
+  const { currentUser, loading } = useAuth();
+  const [currentView, setCurrentView] = useState<AppView>('login');
+  const [userAssessment, setUserAssessment] = useState<UserAssessment | null>(null);
+  const [selectedCareerPath, setSelectedCareerPath] = useState<string>('');
+
   useEffect(() => {
-    const checkHealth = async () => {
-      try {
-        const health = await api.getHealth();
-        setIsHealthy(health.models_loaded);
-      } catch (error) {
-        console.error('Health check failed:', error);
-        setIsHealthy(false);
+    if (currentUser && !loading) {
+      // Check if user has existing assessment
+      const savedAssessment = localStorage.getItem(`assessment_${currentUser.uid}`);
+      if (savedAssessment) {
+        try {
+          const assessment = JSON.parse(savedAssessment);
+          setUserAssessment(assessment);
+          setCurrentView('careers'); // Existing user: go to recommendations (history)
+        } catch (error) {
+          console.error('Failed to parse saved assessment:', error);
+          setCurrentView('assessment'); // Fallback to assessment if data is corrupted
+        }
+      } else {
+        setCurrentView('assessment'); // New user: go to assessment
       }
-    };
-
-    checkHealth();
-  }, []);
-
-  const handleLogin = async (id: string) => {
-    setIsLoading(true);
-    try {
-      // Verify the API is working by trying to get recommendations
-      await api.getRecommendations(id, 1);
-      setStudentId(id);
-    } catch (error) {
-      console.error('Login failed:', error);
-      alert('Failed to login. Please check if the backend API is running.');
-    } finally {
-      setIsLoading(false);
+    } else if (!currentUser && !loading) {
+      setCurrentView('login'); // Not logged in: show login
     }
+  }, [currentUser, loading]);
+
+
+
+  const handleAssessmentComplete = (assessment: UserAssessment) => {
+    setUserAssessment(assessment);
+    // Save assessment for the current user
+    if (currentUser) {
+      localStorage.setItem(`assessment_${currentUser.uid}`, JSON.stringify(assessment));
+    }
+    setCurrentView('careers'); // After assessment, go to recommendations
+  };
+
+  const handleViewLearningPath = (careerPath: string) => {
+    setSelectedCareerPath(careerPath);
+    setCurrentView('learning-path');
+  };
+
+  const handleViewCourseRecommendations = () => {
+    setCurrentView('course-recommendations');
+  };
+
+  const handleBackToCareers = () => {
+    setCurrentView('careers');
   };
 
   const handleLogout = () => {
-    setStudentId(null);
+    setUserAssessment(null);
+    setCurrentView('login');
+    // Clear assessment from localStorage
+    if (currentUser) {
+      localStorage.removeItem(`assessment_${currentUser.uid}`);
+    }
   };
 
-  // Show loading state while checking health
-  if (isHealthy === null) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Checking system status...</p>
-        </div>
-      </div>
-    );
-  }
+  const handleRetakeAssessment = () => {
+    setUserAssessment(null);
+    setCurrentView('assessment');
+  };
 
-  // Show error if API is not healthy
-  if (isHealthy === false) {
+  const renderCurrentView = () => {
+    switch (currentView) {
+      case 'login':
+        return <Login />;
+      case 'assessment':
+        return <InterestAssessment onComplete={handleAssessmentComplete} />;
+      case 'careers':
+        return (
+          <div>
+            <div className="bg-white shadow-sm border-b">
+              <div className="max-w-6xl mx-auto px-4 py-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h1 className="text-2xl font-bold text-gray-900">Career Guidance System</h1>
+                    <p className="text-gray-600">Welcome back, {currentUser?.displayName || currentUser?.email}</p>
+                    {userAssessment && (
+                      <p className="text-sm text-gray-500 mt-1">
+                        Based on your interests in {userAssessment.selectedDomain} and {userAssessment.selectedSubdomain}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={handleRetakeAssessment}
+                      className="btn-secondary"
+                    >
+                      Retake Assessment
+                    </button>
+                    <button
+                      onClick={handleLogout}
+                      className="btn-secondary"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Navigation Tabs */}
+                <div className="flex gap-4 mt-6">
+                  <button
+                    onClick={() => setCurrentView('careers')}
+                    className="bg-primary-600 text-white px-4 py-2 rounded-lg font-medium"
+                  >
+                    Career Paths
+                  </button>
+                  <button
+                    onClick={handleViewCourseRecommendations}
+                    className="bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-2 rounded-lg font-medium transition-colors"
+                  >
+                    Course Recommendations
+                  </button>
+                </div>
+              </div>
+            </div>
+            {userAssessment && (
+              <CareerRecommendations 
+                assessment={userAssessment} 
+                onViewLearningPath={handleViewLearningPath} 
+              />
+            )}
+          </div>
+        );
+      case 'course-recommendations':
+        return (
+          <div>
+            <div className="bg-white shadow-sm border-b">
+              <div className="max-w-6xl mx-auto px-4 py-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h1 className="text-2xl font-bold text-gray-900">Course Recommendations</h1>
+                    <p className="text-gray-600">Personalized courses based on your interests</p>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={handleBackToCareers}
+                      className="btn-secondary"
+                    >
+                      Back to Career Paths
+                    </button>
+                    <button
+                      onClick={handleLogout}
+                      className="btn-secondary"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                </div>
+                
+
+              </div>
+            </div>
+            {userAssessment && (
+              <InterestBasedRecommendations assessment={userAssessment} />
+            )}
+          </div>
+        );
+      case 'learning-path':
+        return (
+          <LearningPath
+            careerPathId={selectedCareerPath}
+            assessment={userAssessment}
+            onBack={handleBackToCareers}
+          />
+        );
+      case 'dashboard':
+        return <Dashboard studentId={currentUser?.uid || ''} onLogout={handleLogout} />;
+      default:
+        return <Login />;
+    }
+  };
+
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-        <div className="text-center max-w-md">
-          <div className="text-red-500 text-6xl mb-4">⚠️</div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Service Unavailable</h2>
-          <p className="text-gray-600 mb-6">
-            The recommendation service is currently unavailable. Please ensure the backend API is running on port 8000.
-          </p>
-          <button 
-            onClick={() => window.location.reload()} 
-            className="btn-primary"
-          >
-            Retry
-          </button>
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 to-blue-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600 mx-auto"></div>
+          <p className="mt-4 text-lg text-gray-600">Loading...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="App">
-      {studentId ? (
-        <Dashboard studentId={studentId} onLogout={handleLogout} />
-      ) : (
-        <Login onLogin={handleLogin} isLoading={isLoading} />
-      )}
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-blue-50">
+      {renderCurrentView()}
     </div>
   );
 }
 
-export default App;
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  );
+}

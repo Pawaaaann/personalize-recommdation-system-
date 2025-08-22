@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { LogOut, RefreshCw, User, BookOpen } from 'lucide-react';
+import { LogOut, RefreshCw, User, BookOpen, Mail } from 'lucide-react';
 import { RecommendationResponse, CourseMetadata } from '../types/api';
 import { api } from '../services/api';
 import { CourseCard } from './CourseCard';
 import { LoadingSkeleton } from './LoadingSkeleton';
+import { useAuth } from '../contexts/AuthContext';
 
 interface DashboardProps {
   studentId: string;
@@ -16,6 +17,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ studentId, onLogout }) => 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const { currentUser } = useAuth();
 
   const fetchRecommendations = async () => {
     try {
@@ -96,6 +98,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ studentId, onLogout }) => 
     );
   }
 
+  // Get display name from Firebase user or fallback to studentId
+  const displayName = currentUser?.displayName || currentUser?.email?.split('@')[0] || studentId;
+  const userEmail = currentUser?.email;
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -110,9 +116,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ studentId, onLogout }) => 
             </div>
             
             <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2 text-sm text-gray-600">
-                <User className="h-4 w-4" />
-                <span>{studentId}</span>
+              {/* User Info */}
+              <div className="flex items-center space-x-3 text-sm text-gray-600">
+                <div className="flex items-center space-x-2">
+                  <User className="h-4 w-4" />
+                  <span className="font-medium">{displayName}</span>
+                </div>
+                {userEmail && (
+                  <div className="flex items-center space-x-1 text-gray-500">
+                    <Mail className="h-3 w-3" />
+                    <span className="hidden sm:inline">{userEmail}</span>
+                  </div>
+                )}
               </div>
               
               <button
@@ -143,10 +158,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ studentId, onLogout }) => 
         {/* Welcome Section */}
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-gray-900 mb-2">
-            Welcome back, {studentId}!
+            Welcome back, {displayName}!
           </h2>
           <p className="text-gray-600">
             Here are your personalized course recommendations based on your learning preferences.
+            {currentUser && (
+              <span className="block mt-1 text-sm text-gray-500">
+                You're signed in as {userEmail}
+              </span>
+            )}
           </p>
         </div>
 

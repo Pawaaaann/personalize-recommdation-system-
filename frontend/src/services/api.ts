@@ -21,6 +21,34 @@ export const api = {
     return response.json();
   },
 
+  // Get interest-based recommendations
+  async getInterestBasedRecommendations(
+    interests: string[], 
+    domain?: string, 
+    subdomain?: string, 
+    experienceLevel?: string, 
+    nRecommendations: number = 5
+  ): Promise<RecommendationResponse[]> {
+    const response = await fetch(`${API_BASE_URL}/recommendations/interest-based`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        interests,
+        domain,
+        subdomain,
+        experience_level: experienceLevel,
+        n_recommendations: nRecommendations
+      }),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch interest-based recommendations');
+    }
+    return response.json();
+  },
+
   // Get course metadata
   async getCourseMetadata(courseId: string): Promise<CourseMetadata> {
     const response = await fetch(`${API_BASE_URL}/course/${courseId}`);
