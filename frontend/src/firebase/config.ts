@@ -2,6 +2,8 @@
 import { initializeApp } from "firebase/app";
 import { getAnalytics, isSupported } from "firebase/analytics";
 import { getAuth } from "firebase/auth";
+import { getStorage } from "firebase/storage";
+import { getFirestore } from "firebase/firestore";
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
 
@@ -26,7 +28,15 @@ isSupported().then(yes => yes ? getAnalytics(app) : null);
 // Initialize Firebase Authentication and get a reference to the service
 export const auth = getAuth(app);
 
-// Debug: Check if auth is initialized
+// Initialize Firebase Storage
+export const storage = getStorage(app);
+
+// Initialize Firestore
+export const db = getFirestore(app);
+
+// Debug: Check if services are initialized
 console.log('Firebase auth initialized:', !!auth);
+console.log('Firebase storage initialized:', !!storage);
+console.log('Firebase firestore initialized:', !!db);
 
 export default app;
