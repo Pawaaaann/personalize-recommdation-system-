@@ -144,11 +144,45 @@ function AppContent() {
                 </div>
               </div>
             </div>
-            {userAssessment && (
+            {userAssessment ? (
               <CareerRecommendations 
                 assessment={userAssessment} 
                 onViewLearningPath={handleViewLearningPath} 
               />
+            ) : (
+              <div className="max-w-6xl mx-auto px-4 py-8">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+                  <h3 className="text-lg font-semibold text-blue-900 mb-2">Complete Your Assessment</h3>
+                  <p className="text-blue-800 mb-4">
+                    To see personalized career recommendations, please complete your career assessment first.
+                  </p>
+                  <button
+                    onClick={handleRetakeAssessment}
+                    className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                  >
+                    Take Assessment
+                  </button>
+                </div>
+                
+                {/* Show sample career paths */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className="bg-white rounded-lg shadow-sm border p-6">
+                    <h4 className="font-semibold text-gray-900 mb-2">Web Development</h4>
+                    <p className="text-gray-600 text-sm mb-3">Build modern web applications and user interfaces</p>
+                    <div className="text-sm text-gray-500">Popular career paths available</div>
+                  </div>
+                  <div className="bg-white rounded-lg shadow-sm border p-6">
+                    <h4 className="font-semibold text-gray-900 mb-2">Data Science</h4>
+                    <p className="text-gray-600 text-sm mb-3">Analyze data and build machine learning models</p>
+                    <div className="text-sm text-gray-500">Popular career paths available</div>
+                  </div>
+                  <div className="bg-white rounded-lg shadow-sm border p-6">
+                    <h4 className="font-semibold text-gray-900 mb-2">Mobile Development</h4>
+                    <p className="text-gray-600 text-sm mb-3">Create mobile apps for iOS and Android</p>
+                    <div className="text-sm text-gray-500">Popular career paths available</div>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         );
@@ -181,8 +215,42 @@ function AppContent() {
 
               </div>
             </div>
-            {userAssessment && (
+            {userAssessment ? (
               <InterestBasedRecommendations assessment={userAssessment} />
+            ) : (
+              <div className="max-w-6xl mx-auto px-4 py-8">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+                  <h3 className="text-lg font-semibold text-blue-900 mb-2">Complete Your Assessment</h3>
+                  <p className="text-blue-800 mb-4">
+                    To see personalized course recommendations, please complete your career assessment first.
+                  </p>
+                  <button
+                    onClick={handleRetakeAssessment}
+                    className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                  >
+                    Take Assessment
+                  </button>
+                </div>
+                
+                {/* Show sample courses */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className="bg-white rounded-lg shadow-sm border p-6">
+                    <h4 className="font-semibold text-gray-900 mb-2">HTML, CSS & JavaScript</h4>
+                    <p className="text-gray-600 text-sm mb-3">Foundation courses for web development</p>
+                    <div className="text-sm text-gray-500">Various platforms available</div>
+                  </div>
+                  <div className="bg-white rounded-lg shadow-sm border p-6">
+                    <h4 className="font-semibold text-gray-900 mb-2">Python Programming</h4>
+                    <p className="text-gray-600 text-sm mb-3">Learn programming fundamentals and data science</p>
+                    <div className="text-sm text-gray-500">Various platforms available</div>
+                  </div>
+                  <div className="bg-white rounded-lg shadow-sm border p-6">
+                    <h4 className="font-semibold text-gray-900 mb-2">React Development</h4>
+                    <p className="text-gray-600 text-sm mb-3">Build modern frontend applications</p>
+                    <div className="text-sm text-gray-500">Various platforms available</div>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         );
