@@ -137,6 +137,27 @@ class LeaderboardResponse(BaseModel):
     badges_count: int = Field(..., description="Number of badges earned")
     rank: int = Field(..., description="Leaderboard rank")
 
+# Assessment Models
+class UserAssessmentRequest(BaseModel):
+    user_id: str = Field(..., description="User identifier")
+    interests: List[str] = Field(..., description="List of user interests")
+    skill_level: str = Field(..., description="User's skill level (beginner, intermediate, advanced)")
+    career_goals: List[str] = Field(..., description="List of career goals")
+    domain: Optional[str] = Field(None, description="Primary domain of interest")
+    subdomain: Optional[str] = Field(None, description="Specific subdomain of interest")
+    experience_level: Optional[str] = Field(None, description="Years of experience")
+
+class UserAssessmentResponse(BaseModel):
+    user_id: str = Field(..., description="User identifier")
+    interests: List[str] = Field(..., description="List of user interests")
+    skill_level: str = Field(..., description="User's skill level")
+    career_goals: List[str] = Field(..., description="List of career goals")
+    domain: Optional[str] = Field(None, description="Primary domain of interest")
+    subdomain: Optional[str] = Field(None, description="Specific subdomain of interest")
+    experience_level: Optional[str] = Field(None, description="Years of experience")
+    completed_at: datetime = Field(..., description="Assessment completion timestamp")
+    recommendations: Optional[List[RecommendationResponse]] = Field(None, description="Personalized recommendations")
+
 # Global variables for models and data
 models_loaded = False
 als_model: Optional[Any] = None  # ALSRecommender
@@ -753,6 +774,139 @@ async def record_gamification_activity(
     except Exception as e:
         print(f"Error recording gamification activity: {e}")
         raise HTTPException(status_code=500, detail="Failed to record activity")
+
+# Assessment endpoints
+@app.post("/users/{user_id}/assessment", response_model=UserAssessmentResponse)
+async def save_user_assessment(user_id: str, assessment: UserAssessmentRequest):
+    """Save user's assessment data and generate personalized recommendations."""
+    try:
+        # Ensure user_id matches the path parameter
+        assessment.user_id = user_id
+        
+        # Generate personalized recommendations based on assessment
+        recommendations = []
+        if assessment.interests:
+            try:
+                # Use the interest-based recommendation system
+                interest_request = InterestBasedRecommendationRequest(
+                    interests=assessment.interests,
+                    domain=assessment.domain,
+                    subdomain=assessment.subdomain,
+                    experience_level=assessment.experience_level,
+                    n_recommendations=8  # Get more recommendations for assessment
+                )
+                
+                # Call the existing recommendation logic
+                rec_response = await get_interest_based_recommendations(interest_request)
+                recommendations = rec_response[:6]  # Limit to 6 for assessment
+                
+            except Exception as e:
+                print(f"Failed to generate recommendations for assessment: {e}")
+        
+        # Save assessment data to file storage (will be migrated to Firebase automatically via hybrid storage)
+        assessment_data = {
+            "user_id": user_id,
+            "interests": assessment.interests,
+            "skill_level": assessment.skill_level,
+            "career_goals": assessment.career_goals,
+            "domain": assessment.domain,
+            "subdomain": assessment.subdomain,
+            "experience_level": assessment.experience_level,
+            "completed_at": datetime.now().isoformat(),
+            "recommendations": [rec.model_dump() for rec in recommendations] if recommendations else []
+        }
+        
+        # Create assessments directory if it doesn't exist
+        assessments_dir = Path("data/assessments")
+        assessments_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Save to file
+        assessment_file = assessments_dir / f"{user_id}.json"
+        with open(assessment_file, 'w') as f:
+            json.dump(assessment_data, f, indent=2)
+        
+        # Record gamification activity for completing assessment
+        gamification_engine.process_user_activity(
+            user_id=user_id,
+            activity_type="assessment",
+            metadata={"assessment_completed": True}
+        )
+        
+        print(f"Assessment saved for user: {user_id}")
+        
+        return UserAssessmentResponse(
+            user_id=user_id,
+            interests=assessment.interests,
+            skill_level=assessment.skill_level,
+            career_goals=assessment.career_goals,
+            domain=assessment.domain,
+            subdomain=assessment.subdomain,
+            experience_level=assessment.experience_level,
+            completed_at=datetime.now(),
+            recommendations=recommendations
+        )
+        
+    except Exception as e:
+        print(f"Error saving user assessment: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save user assessment")
+
+@app.get("/users/{user_id}/assessment", response_model=UserAssessmentResponse)
+async def get_user_assessment(user_id: str):
+    """Get user's assessment data and recommendations."""
+    try:
+        # Try to load from file storage
+        assessment_file = Path("data/assessments") / f"{user_id}.json"
+        
+        if not assessment_file.exists():
+            raise HTTPException(status_code=404, detail="Assessment data not found")
+        
+        with open(assessment_file, 'r') as f:
+            data = json.load(f)
+        
+        # Convert recommendations back to response objects
+        recommendations = []
+        if data.get("recommendations"):
+            for rec_data in data["recommendations"]:
+                recommendations.append(RecommendationResponse(
+                    course_id=rec_data["course_id"],
+                    score=rec_data["score"],
+                    explanation=rec_data["explanation"]
+                ))
+        
+        return UserAssessmentResponse(
+            user_id=data["user_id"],
+            interests=data.get("interests", []),
+            skill_level=data.get("skill_level", "beginner"),
+            career_goals=data.get("career_goals", []),
+            domain=data.get("domain"),
+            subdomain=data.get("subdomain"),
+            experience_level=data.get("experience_level"),
+            completed_at=datetime.fromisoformat(data["completed_at"]),
+            recommendations=recommendations
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting user assessment: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get user assessment")
+
+@app.get("/users/{user_id}/assessment/exists")
+async def check_assessment_exists(user_id: str):
+    """Check if user has completed an assessment."""
+    try:
+        assessment_file = Path("data/assessments") / f"{user_id}.json"
+        exists = assessment_file.exists()
+        
+        return {
+            "user_id": user_id,
+            "assessment_exists": exists,
+            "completed_at": None if not exists else datetime.fromtimestamp(assessment_file.stat().st_mtime).isoformat()
+        }
+        
+    except Exception as e:
+        print(f"Error checking assessment existence: {e}")
+        raise HTTPException(status_code=500, detail="Failed to check assessment")
 
 # Monitoring endpoints
 @app.get("/health")
