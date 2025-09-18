@@ -113,6 +113,194 @@ const CAREER_PATHS: Record<string, CareerPath[]> = {
           projects: ['REST API', 'User Authentication System', 'Database Management App']
         }
       ]
+    },
+    {
+      id: 'full-stack-developer',
+      name: 'Full-Stack Developer',
+      description: 'Handle both frontend and backend development',
+      difficulty: 'advanced',
+      estimatedTime: '12-24 months',
+      skills: ['Full-stack technologies', 'System Design', 'DevOps'],
+      salaryRange: '$80K - $150K',
+      growthPotential: 'high',
+      matchScore: 78,
+      learningPath: [
+        {
+          phase: 'Full-Stack Integration (Months 1-12)',
+          duration: '12 months',
+          topics: ['Frontend + Backend', 'Database Design', 'API Integration', 'Deployment'],
+          courses: [
+            {
+              title: 'Full Stack Web Development',
+              platform: 'coursera',
+              url: 'https://www.coursera.org/specializations/full-stack-web-development',
+              rating: 4.6,
+              duration: '120 hours',
+              level: 'Advanced',
+              price: 'Free'
+            }
+          ],
+          projects: ['Complete E-commerce Platform', 'Social Media App', 'Real-time Chat Application']
+        }
+      ]
+    }
+  ],
+  'data-science': [
+    {
+      id: 'data-analyst',
+      name: 'Data Analyst',
+      description: 'Analyze data to help businesses make decisions',
+      difficulty: 'beginner',
+      estimatedTime: '4-8 months',
+      skills: ['SQL', 'Python', 'Excel', 'Statistics', 'Visualization'],
+      salaryRange: '$50K - $90K',
+      growthPotential: 'high',
+      matchScore: 85,
+      learningPath: [
+        {
+          phase: 'Foundation (Months 1-4)',
+          duration: '4 months',
+          topics: ['SQL Fundamentals', 'Excel/Google Sheets', 'Python Basics', 'Statistics'],
+          courses: [
+            {
+              title: 'Google Data Analytics Professional Certificate',
+              platform: 'coursera',
+              url: 'https://www.coursera.org/professional-certificates/google-data-analytics',
+              rating: 4.6,
+              duration: '180 hours',
+              level: 'Beginner',
+              price: 'Free'
+            }
+          ],
+          projects: ['Sales Data Analysis', 'Customer Behavior Analysis', 'Financial Dashboard']
+        }
+      ]
+    },
+    {
+      id: 'data-scientist',
+      name: 'Data Scientist',
+      description: 'Build predictive models and advanced analytics',
+      difficulty: 'advanced',
+      estimatedTime: '12-24 months',
+      skills: ['Machine Learning', 'Python', 'Statistics', 'Big Data'],
+      salaryRange: '$80K - $150K',
+      growthPotential: 'high',
+      matchScore: 80,
+      learningPath: [
+        {
+          phase: 'Machine Learning (Months 1-12)',
+          duration: '12 months',
+          topics: ['Machine Learning', 'Deep Learning', 'Python/R', 'Big Data Tools'],
+          courses: [
+            {
+              title: 'Machine Learning Specialization',
+              platform: 'coursera',
+              url: 'https://www.coursera.org/specializations/machine-learning-introduction',
+              rating: 4.9,
+              duration: '120 hours',
+              level: 'Advanced',
+              price: 'Free'
+            }
+          ],
+          projects: ['Predictive Model', 'Recommendation System', 'Computer Vision App']
+        }
+      ]
+    }
+  ],
+  'cybersecurity': [
+    {
+      id: 'cybersecurity-analyst',
+      name: 'Cybersecurity Analyst',
+      description: 'Protect systems and networks from cyber threats',
+      difficulty: 'intermediate',
+      estimatedTime: '8-18 months',
+      skills: ['Network Security', 'Ethical Hacking', 'Incident Response'],
+      salaryRange: '$70K - $120K',
+      growthPotential: 'very high',
+      matchScore: 85,
+      learningPath: [
+        {
+          phase: 'Security Fundamentals (Months 1-8)',
+          duration: '8 months',
+          topics: ['Network Security', 'Ethical Hacking', 'Security Tools', 'Compliance'],
+          courses: [
+            {
+              title: 'Google Cybersecurity Professional Certificate',
+              platform: 'coursera',
+              url: 'https://www.coursera.org/professional-certificates/google-cybersecurity',
+              rating: 4.7,
+              duration: '180 hours',
+              level: 'Intermediate',
+              price: 'Free'
+            }
+          ],
+          projects: ['Security Assessment', 'Incident Response Plan', 'Penetration Testing']
+        }
+      ]
+    }
+  ],
+  'digital-marketing': [
+    {
+      id: 'digital-marketer',
+      name: 'Digital Marketer',
+      description: 'Create and manage online marketing campaigns',
+      difficulty: 'beginner',
+      estimatedTime: '3-6 months',
+      skills: ['SEO', 'Social Media', 'Google Ads', 'Analytics'],
+      salaryRange: '$40K - $80K',
+      growthPotential: 'high',
+      matchScore: 85,
+      learningPath: [
+        {
+          phase: 'Digital Marketing Basics (Months 1-3)',
+          duration: '3 months',
+          topics: ['SEO', 'Social Media Marketing', 'Google Ads', 'Analytics'],
+          courses: [
+            {
+              title: 'Google Digital Marketing & E-commerce Certificate',
+              platform: 'coursera',
+              url: 'https://www.coursera.org/professional-certificates/google-digital-marketing-ecommerce',
+              rating: 4.7,
+              duration: '120 hours',
+              level: 'Beginner',
+              price: 'Free'
+            }
+          ],
+          projects: ['SEO Campaign', 'Social Media Strategy', 'PPC Campaign']
+        }
+      ]
+    }
+  ],
+  'product-management': [
+    {
+      id: 'product-manager',
+      name: 'Product Manager',
+      description: 'Lead product strategy and development',
+      difficulty: 'intermediate',
+      estimatedTime: '6-12 months',
+      skills: ['Product Strategy', 'User Research', 'Analytics', 'Leadership'],
+      salaryRange: '$80K - $140K',
+      growthPotential: 'high',
+      matchScore: 85,
+      learningPath: [
+        {
+          phase: 'Product Management Fundamentals (Months 1-6)',
+          duration: '6 months',
+          topics: ['Product Strategy', 'User Research', 'Product Analytics', 'Agile Methodology'],
+          courses: [
+            {
+              title: 'Product Management Fundamentals',
+              platform: 'udemy',
+              url: 'https://www.udemy.com/course/product-management-fundamentals/',
+              rating: 4.5,
+              duration: '40 hours',
+              level: 'Intermediate',
+              price: '$79.99'
+            }
+          ],
+          projects: ['Product Roadmap', 'User Research Study', 'Product Launch Plan']
+        }
+      ]
     }
   ]
 };
