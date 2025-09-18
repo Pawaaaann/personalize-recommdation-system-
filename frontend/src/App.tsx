@@ -180,7 +180,7 @@ function AppContent() {
           />
         );
       case 'dashboard':
-        return <Dashboard studentId={currentUser?.uid || ''} onLogout={handleLogout} />;
+        return <Dashboard studentId={currentUser?.uid || ''} onLogout={handleLogout} assessment={userAssessment} />;
       default:
         return <Login />;
     }
