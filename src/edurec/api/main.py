@@ -15,8 +15,8 @@ from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from ..models.hybrid import hybrid_recommend
-from ..models.als_recommender import ALSRecommender
+# from ..models.hybrid import hybrid_recommend
+# from ..models.als_recommender import ALSRecommender
 from ..models.baseline import BaselineRecommender
 from ..data.data_loader import DataLoader
 from ..monitoring.metrics import get_metrics_collector
@@ -99,7 +99,7 @@ class ExperimentStatsResponse(BaseModel):
 
 # Global variables for models and data
 models_loaded = False
-als_model: Optional[ALSRecommender] = None
+als_model: Optional = None  # ALSRecommender
 baseline_model: Optional[BaselineRecommender] = None
 courses_df: Optional[pd.DataFrame] = None
 interactions_df: Optional[pd.DataFrame] = None
@@ -143,16 +143,16 @@ def load_models_and_data():
             metrics_collector.set_active_users(unique_users)
         
         # Load ALS model if available
-        als_model_path = MODELS_DIR / "als_model.pkl"
-        if als_model_path.exists():
-            als_start_time = time.time()
-            als_model = ALSRecommender()
-            als_model.load(str(als_model_path))
-            als_duration = time.time() - als_start_time
-            metrics_collector.record_model_load_time("als_model", als_duration)
-            print(f"Loaded ALS model from {als_model_path} in {als_duration:.3f}s")
-        else:
-            print(f"ALS model not found at {als_model_path}")
+        # als_model_path = MODELS_DIR / "als_model.pkl"
+        # if als_model_path.exists():
+        #     als_start_time = time.time()
+        #     als_model = ALSRecommender()
+        #     als_model.load(str(als_model_path))
+        #     als_duration = time.time() - als_start_time
+        #     metrics_collector.record_model_load_time("als_model", als_duration)
+        #     print(f"Loaded ALS model from {als_model_path} in {als_duration:.3f}s")
+        # else:
+        print(f"ALS model not available - using baseline model only")
         
         # Load baseline model
         baseline_start_time = time.time()
@@ -226,15 +226,11 @@ async def get_recommendations(
         raise HTTPException(status_code=503, detail="Models not loaded")
     
     try:
-        # Get recommendations using hybrid approach
-        recommendations = hybrid_recommend(
-            user_id=student_id,
-            N=k,
-            als_model=als_model,
-            baseline_model=baseline_model,
-            courses_df=courses_df,
-            interactions_df=interactions_df
-        )
+        # Get recommendations using baseline model only
+        if baseline_model is None:
+            raise HTTPException(status_code=503, detail="Baseline model not loaded")
+        
+        recommendations = baseline_model.recommend(student_id, n_recommendations=k)
         
         # Convert to response format
         response = []

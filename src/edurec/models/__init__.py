@@ -9,8 +9,8 @@ from .baseline import (
     get_course_popularity_stats,
     get_course_similarity_matrix
 )
-from .als_recommender import ALSRecommender
-from .hybrid import HybridRecommender
+# from .als_recommender import ALSRecommender
+# from .hybrid import HybridRecommender
 
 __all__ = [
     "BaseRecommender",
@@ -19,6 +19,6 @@ __all__ = [
     "content_based_recommender", 
     "get_course_popularity_stats",
     "get_course_similarity_matrix",
-    "ALSRecommender",
-    "HybridRecommender"
+    # "ALSRecommender",
+    # "HybridRecommender"
 ] 
