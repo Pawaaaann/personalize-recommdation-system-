@@ -18,10 +18,7 @@ function AppContent() {
 
   useEffect(() => {
     if (currentUser && !loading) {
-      // Always route authenticated users to dashboard first
-      setCurrentView('dashboard');
-      
-      // Try to load saved assessment data if available
+      // Check for saved assessment data first
       const assessmentKey = `assessment_${currentUser.uid}`;
       const savedAssessment = localStorage.getItem(assessmentKey);
       
@@ -29,14 +26,29 @@ function AppContent() {
         try {
           const assessment = JSON.parse(savedAssessment);
           setUserAssessment(assessment);
+          setCurrentView('careers'); // Existing user with data: go to career recommendations
         } catch (error) {
           console.error('Failed to parse saved assessment:', error);
           // Clear corrupted data
           localStorage.removeItem(assessmentKey);
           setUserAssessment(null);
+          setCurrentView('assessment'); // Corrupted data: retake assessment
         }
       } else {
-        setUserAssessment(null);
+        // Check if this is likely an existing user (has profile info from Google/other providers)
+        const isLikelyExistingUser = currentUser.displayName || 
+                                   (currentUser.email && !currentUser.email.includes('test')) ||
+                                   currentUser.photoURL;
+        
+        if (isLikelyExistingUser) {
+          // Existing user without saved assessment data - go to careers with empty assessment
+          setUserAssessment(null);
+          setCurrentView('careers');
+        } else {
+          // Truly new user: go to assessment
+          setUserAssessment(null);
+          setCurrentView('assessment');
+        }
       }
     } else if (!currentUser && !loading) {
       setCurrentView('login'); // Not logged in: show login
