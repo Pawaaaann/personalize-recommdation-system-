@@ -8,6 +8,19 @@ EduRec is a comprehensive AI-powered education recommendation platform that prov
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+
+### September 18, 2025 - Enhanced Assessment and Recommendation System
+- **Comprehensive Assessment Expansion**: Enhanced the user assessment from 6 steps to 9 steps to capture more specific preferences:
+  - Added specific technology preferences (React, Python, etc.) instead of generic interests
+  - Added learning style preferences (hands-on projects, video tutorials, interactive coding, etc.)
+  - Added project type preferences (web applications, mobile apps, data analysis tools, etc.)
+  - Added current skills assessment and learning goals
+- **Improved Course Recommendations**: Updated the recommendation algorithm to utilize all collected assessment data including technologies, learning styles, project types, and learning goals for better personalization
+- **Performance Optimization**: Implemented parallel fetching of course metadata to reduce load times for recommendation results
+- **Enhanced UI Communication**: Updated the interface to clearly show how courses align with specific user preferences and technologies rather than just generic interests
+- **Fallback System**: Maintained robust fallback mechanisms to ensure every domain shows relevant recommendations even without assessment data
+
 ## System Architecture
 
 ### Backend Architecture
@@ -44,7 +57,7 @@ The frontend uses React with TypeScript and modern development practices:
 - **Persistent Sessions**: Maintains login state across browser sessions
 
 **User Experience Flow:**
-- **Interest Assessment**: 6-step guided process collecting domain preferences, experience level, and learning goals
+- **Interest Assessment**: 9-step comprehensive process collecting domain preferences, specific technology interests, learning styles, project types, experience level, time commitment, and learning goals
 - **Career Path Recommendations**: AI-powered matching with detailed career information, salary ranges, and skill requirements
 - **Learning Roadmaps**: Structured weekly schedules with specific topics, courses, and project milestones
 - **Course Discovery**: Integration with major learning platforms (Coursera, Udemy, edX, freeCodeCamp)

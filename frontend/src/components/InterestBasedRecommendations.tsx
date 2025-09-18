@@ -33,60 +33,77 @@ export const InterestBasedRecommendations: React.FC<InterestBasedRecommendations
       setError(null);
       
       // Get at least 5 recommendations based on comprehensive user profile
+      const allPreferences = [
+        ...(assessment.interests || []),
+        ...(assessment.specificTechnologies || []),
+        ...(assessment.projectTypes || []),
+        ...(assessment.learningStyles || []),
+        ...(assessment.currentSkills || []),
+        ...(assessment.learningGoals || [])
+      ];
+      
       const apiRecommendations = await api.getInterestBasedRecommendations(
-        [...(assessment.interests || []), ...(assessment.specificTechnologies || []), ...(assessment.projectTypes || [])],
+        allPreferences,
         assessment.selectedDomain,
         assessment.selectedSubdomain,
         assessment.experienceLevel,
         5
       );
 
-      // Fetch course metadata for each recommendation
+      // Fetch course metadata in parallel for better performance
       const courseRecommendations: CourseRecommendation[] = [];
       
-      for (const rec of apiRecommendations) {
-        try {
-          // Handle generic course IDs (fallback recommendations)
-          if (rec.course_id.startsWith('generic_')) {
-            const genericCourse = getGenericCourseData(rec.course_id, assessment);
-            courseRecommendations.push({
-              course: genericCourse,
+      // Separate generic and real course IDs
+      const genericRecs = apiRecommendations.filter(rec => rec.course_id.startsWith('generic_'));
+      const realRecs = apiRecommendations.filter(rec => !rec.course_id.startsWith('generic_'));
+      
+      // Handle generic courses immediately
+      genericRecs.forEach(rec => {
+        const genericCourse = getGenericCourseData(rec.course_id, assessment);
+        courseRecommendations.push({
+          course: genericCourse,
+          score: rec.score,
+          explanation: rec.explanation,
+          matchReason: "Recommended for your field and experience level"
+        });
+      });
+      
+      // Fetch real course metadata in parallel
+      if (realRecs.length > 0) {
+        const courseMetadataPromises = realRecs.map(async rec => {
+          try {
+            const courseMetadata = await api.getCourseMetadata(rec.course_id);
+            
+            // Determine match reason based on score and explanations
+            let matchReason = "Based on your preferences";
+            if (rec.score > 0.8) {
+              matchReason = "Excellent match with your learning goals";
+            } else if (rec.score > 0.6) {
+              matchReason = "Good match with your tech interests";
+            } else if (rec.score > 0.4) {
+              matchReason = "Relevant to your selected domain";
+            }
+            
+            return {
+              course: courseMetadata,
               score: rec.score,
               explanation: rec.explanation,
-              matchReason: "Recommended for your field and experience level"
-            });
-            continue;
+              matchReason
+            };
+          } catch (err) {
+            console.warn(`Failed to fetch metadata for course ${rec.course_id}:`, err);
+            const fallbackCourse = getFallbackCourseData(rec.course_id, assessment);
+            return {
+              course: fallbackCourse,
+              score: rec.score,
+              explanation: rec.explanation,
+              matchReason: "Recommended course in your field"
+            };
           }
-          
-          const courseMetadata = await api.getCourseMetadata(rec.course_id);
-          
-          // Determine match reason based on score and explanations
-          let matchReason = "Based on your preferences";
-          if (rec.score > 0.8) {
-            matchReason = "Excellent match with your learning goals";
-          } else if (rec.score > 0.6) {
-            matchReason = "Good match with your tech interests";
-          } else if (rec.score > 0.4) {
-            matchReason = "Relevant to your selected domain";
-          }
-          
-          courseRecommendations.push({
-            course: courseMetadata,
-            score: rec.score,
-            explanation: rec.explanation,
-            matchReason
-          });
-        } catch (err) {
-          console.warn(`Failed to fetch metadata for course ${rec.course_id}:`, err);
-          // Add a fallback course if metadata fetch fails
-          const fallbackCourse = getFallbackCourseData(rec.course_id, assessment);
-          courseRecommendations.push({
-            course: fallbackCourse,
-            score: rec.score,
-            explanation: rec.explanation,
-            matchReason: "Recommended course in your field"
-          });
-        }
+        });
+        
+        const realCourseRecs = await Promise.all(courseMetadataPromises);
+        courseRecommendations.push(...realCourseRecs);
       }
 
       // Sort by score and ensure we have at least 4 recommendations
