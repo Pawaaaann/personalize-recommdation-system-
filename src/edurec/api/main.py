@@ -21,6 +21,8 @@ from ..models.baseline import BaselineRecommender
 from ..data.data_loader import DataLoader
 from ..monitoring.metrics import get_metrics_collector
 from ..monitoring.ab_testing import get_ab_test_manager
+from ..gamification.engine import GamificationEngine
+from ..gamification.badge_definitions import get_all_badges
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -97,16 +99,55 @@ class ExperimentStatsResponse(BaseModel):
     conversions: Dict[str, Dict[str, int]] = Field(..., description="Conversion counts per variant")
     precision_at_10: Dict[str, float] = Field(..., description="Precision@10 scores per variant")
 
+# Gamification Models
+class UserStatsResponse(BaseModel):
+    user_id: str = Field(..., description="User identifier")
+    total_xp: int = Field(..., description="Total experience points")
+    level: int = Field(..., description="User level")
+    current_streak: int = Field(..., description="Current consecutive days streak")
+    longest_streak: int = Field(..., description="Longest streak achieved")
+    earned_badges: List[str] = Field(..., description="List of earned badge IDs")
+    courses_completed: int = Field(..., description="Number of courses completed")
+    courses_liked: int = Field(..., description="Number of courses liked")
+    domains_explored: List[str] = Field(..., description="Domains the user has explored")
+
+class ActivityUpdateResponse(BaseModel):
+    xp_gained: int = Field(..., description="XP points gained from this activity")
+    badges_earned: List[str] = Field(..., description="New badges earned")
+    level_up: bool = Field(..., description="Whether user leveled up")
+    streak_updated: bool = Field(..., description="Whether streak was updated")
+    current_stats: UserStatsResponse = Field(..., description="Updated user stats")
+
+class BadgeResponse(BaseModel):
+    id: str = Field(..., description="Badge identifier")
+    name: str = Field(..., description="Badge name")
+    description: str = Field(..., description="Badge description")
+    type: str = Field(..., description="Badge type")
+    rarity: str = Field(..., description="Badge rarity")
+    icon: str = Field(..., description="Badge icon")
+    points: int = Field(..., description="XP points for earning this badge")
+    color: str = Field(..., description="Badge color class")
+
+class LeaderboardResponse(BaseModel):
+    user_id: str = Field(..., description="User identifier")
+    username: str = Field(..., description="Display name")
+    total_xp: int = Field(..., description="Total experience points")
+    level: int = Field(..., description="User level")
+    current_streak: int = Field(..., description="Current streak")
+    badges_count: int = Field(..., description="Number of badges earned")
+    rank: int = Field(..., description="Leaderboard rank")
+
 # Global variables for models and data
 models_loaded = False
-als_model: Optional = None  # ALSRecommender
+als_model: Optional[Any] = None  # ALSRecommender
 baseline_model: Optional[BaselineRecommender] = None
 courses_df: Optional[pd.DataFrame] = None
 interactions_df: Optional[pd.DataFrame] = None
 
-# Initialize monitoring
+# Initialize monitoring and gamification
 metrics_collector = get_metrics_collector()
 ab_test_manager = get_ab_test_manager()
+gamification_engine = GamificationEngine()
 
 # Paths for data and models
 DATA_DIR = Path("data")
@@ -521,7 +562,41 @@ async def record_interaction(event: InteractionEvent):
         if event.event_type in ["enroll", "complete"]:
             ab_test_manager.record_conversion(event.student_id, "new_algorithm_v1", event.event_type)
         
-        return {"message": "Interaction recorded successfully", "event": event.model_dump()}
+        # Process gamification for this activity
+        gamification_updates = gamification_engine.process_user_activity(
+            user_id=event.student_id,
+            activity_type=event.event_type,
+            metadata={
+                "course_id": event.course_id,
+                "timestamp": event.timestamp.isoformat() if event.timestamp else None
+            }
+        )
+        
+        # Get updated user stats for response
+        user_stats = gamification_engine.get_user_stats(event.student_id)
+        stats_response = UserStatsResponse(
+            user_id=user_stats.user_id,
+            total_xp=user_stats.total_xp,
+            level=user_stats.level,
+            current_streak=user_stats.current_streak,
+            longest_streak=user_stats.longest_streak,
+            earned_badges=user_stats.earned_badges,
+            courses_completed=user_stats.courses_completed,
+            courses_liked=user_stats.courses_liked,
+            domains_explored=list(user_stats.domains_explored)
+        )
+        
+        return {
+            "message": "Interaction recorded successfully", 
+            "event": event.model_dump(),
+            "gamification": ActivityUpdateResponse(
+                xp_gained=gamification_updates["xp_gained"],
+                badges_earned=gamification_updates["badges_earned"],
+                level_up=gamification_updates["level_up"],
+                streak_updated=gamification_updates["streak_updated"],
+                current_stats=stats_response
+            ).model_dump()
+        }
         
     except HTTPException:
         raise
@@ -559,6 +634,125 @@ async def clear_interactions_queue():
     except Exception as e:
         print(f"Error clearing interactions queue: {e}")
         raise HTTPException(status_code=500, detail="Failed to clear interactions queue")
+
+# Gamification endpoints
+@app.get("/gamification/stats/{user_id}", response_model=UserStatsResponse)
+async def get_user_stats(user_id: str):
+    """Get user's gamification statistics."""
+    try:
+        stats = gamification_engine.get_user_stats(user_id)
+        return UserStatsResponse(
+            user_id=stats.user_id,
+            total_xp=stats.total_xp,
+            level=stats.level,
+            current_streak=stats.current_streak,
+            longest_streak=stats.longest_streak,
+            earned_badges=stats.earned_badges,
+            courses_completed=stats.courses_completed,
+            courses_liked=stats.courses_liked,
+            domains_explored=list(stats.domains_explored)
+        )
+    except Exception as e:
+        print(f"Error getting user stats: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get user stats")
+
+@app.get("/gamification/badges", response_model=List[BadgeResponse])
+async def get_all_badges():
+    """Get all available badges."""
+    try:
+        badges = get_all_badges()
+        badge_list = []
+        for badge_id, badge in badges.items():
+            badge_list.append(BadgeResponse(
+                id=badge.id,
+                name=badge.name,
+                description=badge.description,
+                type=badge.type.value,
+                rarity=badge.rarity.value,
+                icon=badge.icon,
+                points=badge.points,
+                color=badge.color
+            ))
+        return badge_list
+    except Exception as e:
+        print(f"Error getting badges: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get badges")
+
+@app.get("/gamification/badges/progress/{user_id}")
+async def get_badge_progress(user_id: str):
+    """Get user's badge progress."""
+    try:
+        progress = gamification_engine.get_badge_progress(user_id)
+        return {"badge_progress": progress}
+    except Exception as e:
+        print(f"Error getting badge progress: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get badge progress")
+
+@app.get("/gamification/leaderboard", response_model=List[LeaderboardResponse])
+async def get_leaderboard(limit: int = Query(50, ge=1, le=100)):
+    """Get the global leaderboard."""
+    try:
+        leaderboard = gamification_engine.get_leaderboard(limit)
+        return [LeaderboardResponse(
+            user_id=entry.user_id,
+            username=entry.username,
+            total_xp=entry.total_xp,
+            level=entry.level,
+            current_streak=entry.current_streak,
+            badges_count=entry.badges_count,
+            rank=entry.rank
+        ) for entry in leaderboard]
+    except Exception as e:
+        print(f"Error getting leaderboard: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get leaderboard")
+
+@app.get("/gamification/rank/{user_id}")
+async def get_user_rank(user_id: str):
+    """Get user's rank on the leaderboard."""
+    try:
+        rank = gamification_engine.get_user_rank(user_id)
+        return {"user_id": user_id, "rank": rank}
+    except Exception as e:
+        print(f"Error getting user rank: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get user rank")
+
+@app.post("/gamification/activity/{user_id}")
+async def record_gamification_activity(
+    user_id: str,
+    activity_type: str = Query(..., description="Type of activity"),
+    metadata: Optional[Dict[str, Any]] = None
+):
+    """Record a gamification activity directly (for testing/admin)."""
+    try:
+        updates = gamification_engine.process_user_activity(
+            user_id=user_id,
+            activity_type=activity_type,
+            metadata=metadata or {}
+        )
+        
+        user_stats = gamification_engine.get_user_stats(user_id)
+        stats_response = UserStatsResponse(
+            user_id=user_stats.user_id,
+            total_xp=user_stats.total_xp,
+            level=user_stats.level,
+            current_streak=user_stats.current_streak,
+            longest_streak=user_stats.longest_streak,
+            earned_badges=user_stats.earned_badges,
+            courses_completed=user_stats.courses_completed,
+            courses_liked=user_stats.courses_liked,
+            domains_explored=list(user_stats.domains_explored)
+        )
+        
+        return ActivityUpdateResponse(
+            xp_gained=updates["xp_gained"],
+            badges_earned=updates["badges_earned"],
+            level_up=updates["level_up"],
+            streak_updated=updates["streak_updated"],
+            current_stats=stats_response
+        )
+    except Exception as e:
+        print(f"Error recording gamification activity: {e}")
+        raise HTTPException(status_code=500, detail="Failed to record activity")
 
 # Monitoring endpoints
 @app.get("/health")

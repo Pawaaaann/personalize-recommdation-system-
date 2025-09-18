@@ -59,7 +59,7 @@ export const api = {
   },
 
   // Record interaction
-  async recordInteraction(interaction: InteractionEvent): Promise<void> {
+  async recordInteraction(interaction: InteractionEvent): Promise<any> {
     const response = await fetch(`${API_BASE_URL}/interactions`, {
       method: 'POST',
       headers: {
@@ -71,6 +71,8 @@ export const api = {
     if (!response.ok) {
       throw new Error('Failed to record interaction');
     }
+    
+    return await response.json();
   },
 
   // Get interactions queue (for debugging)
