@@ -45,7 +45,7 @@ function AppContent() {
     if (currentUser) {
       localStorage.setItem(`assessment_${currentUser.uid}`, JSON.stringify(assessment));
     }
-    setCurrentView('careers'); // After assessment, go to recommendations
+    setCurrentView('dashboard'); // After assessment, go to dashboard
   };
 
   const handleViewLearningPath = (careerPath: string) => {
@@ -64,10 +64,7 @@ function AppContent() {
   const handleLogout = () => {
     setUserAssessment(null);
     setCurrentView('login');
-    // Clear assessment from localStorage
-    if (currentUser) {
-      localStorage.removeItem(`assessment_${currentUser.uid}`);
-    }
+    // Keep assessment data in localStorage for future logins
   };
 
   const handleRetakeAssessment = () => {
