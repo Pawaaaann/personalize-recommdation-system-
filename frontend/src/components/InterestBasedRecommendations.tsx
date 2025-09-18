@@ -32,9 +32,9 @@ export const InterestBasedRecommendations: React.FC<InterestBasedRecommendations
       setLoading(true);
       setError(null);
       
-      // Get at least 5 recommendations based on user interests
+      // Get at least 5 recommendations based on comprehensive user profile
       const apiRecommendations = await api.getInterestBasedRecommendations(
-        assessment.interests,
+        [...(assessment.interests || []), ...(assessment.specificTechnologies || []), ...(assessment.projectTypes || [])],
         assessment.selectedDomain,
         assessment.selectedSubdomain,
         assessment.experienceLevel,
@@ -61,13 +61,13 @@ export const InterestBasedRecommendations: React.FC<InterestBasedRecommendations
           const courseMetadata = await api.getCourseMetadata(rec.course_id);
           
           // Determine match reason based on score and explanations
-          let matchReason = "Based on your interests";
+          let matchReason = "Based on your preferences";
           if (rec.score > 0.8) {
-            matchReason = "Excellent match with your interests";
+            matchReason = "Excellent match with your learning goals";
           } else if (rec.score > 0.6) {
-            matchReason = "Good match with your interests";
+            matchReason = "Good match with your tech interests";
           } else if (rec.score > 0.4) {
-            matchReason = "Relevant to your interests";
+            matchReason = "Relevant to your selected domain";
           }
           
           courseRecommendations.push({
@@ -349,12 +349,24 @@ export const InterestBasedRecommendations: React.FC<InterestBasedRecommendations
                     </div>
                     
                     <div>
-                      <h5 className="font-medium text-gray-900 mb-3">Your Interest Alignment:</h5>
+                      <h5 className="font-medium text-gray-900 mb-3">Your Preferences Alignment:</h5>
                       <div className="space-y-2">
-                        {assessment.interests.map((interest, idx) => (
+                        {assessment.specificTechnologies && assessment.specificTechnologies.slice(0, 3).map((tech, idx) => (
+                          <div key={idx} className="text-sm text-gray-600 flex items-center gap-2">
+                            <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                            <span className="font-medium">{tech}</span> - Technology interest
+                          </div>
+                        ))}
+                        {assessment.projectTypes && assessment.projectTypes.slice(0, 2).map((project, idx) => (
+                          <div key={idx} className="text-sm text-gray-600 flex items-center gap-2">
+                            <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+                            <span className="font-medium">{project}</span> - Project type
+                          </div>
+                        ))}
+                        {assessment.interests && assessment.interests.slice(0, 2).map((interest, idx) => (
                           <div key={idx} className="text-sm text-gray-600 flex items-center gap-2">
                             <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-                            {interest}
+                            {interest} - General interest
                           </div>
                         ))}
                       </div>
@@ -364,9 +376,11 @@ export const InterestBasedRecommendations: React.FC<InterestBasedRecommendations
                   <div className="mt-6 p-4 bg-blue-50 rounded-lg">
                     <h5 className="font-medium text-blue-900 mb-2">💡 Pro Tip</h5>
                     <p className="text-sm text-blue-800">
-                      This course aligns with {assessment.interests.length} of your interests and is 
-                      perfect for your {assessment.experienceLevel} experience level. 
-                      Consider starting with this course to build a strong foundation in your field.
+                      This course aligns with {(assessment.specificTechnologies?.length || 0) + (assessment.interests?.length || 0)} of your preferences and is 
+                      perfect for your {assessment.experienceLevel} experience level.
+                      {assessment.learningStyles && assessment.learningStyles.length > 0 && 
+                        ` The course format matches your preferred learning style: ${assessment.learningStyles[0]}.`
+                      }
                     </p>
                   </div>
                 </div>
@@ -381,7 +395,8 @@ export const InterestBasedRecommendations: React.FC<InterestBasedRecommendations
             Found {recommendations.length} courses perfectly matched to your interests and experience level.
           </p>
           <p className="text-sm text-gray-500 mt-2">
-            Each recommendation is personalized based on your selected interests: {assessment.interests.join(', ')}
+            Each recommendation is personalized based on your technology interests: {(assessment.specificTechnologies || []).slice(0, 3).join(', ')}
+            {assessment.projectTypes && assessment.projectTypes.length > 0 && ` and project goals: ${assessment.projectTypes.slice(0, 2).join(', ')}`}
           </p>
         </div>
       </div>

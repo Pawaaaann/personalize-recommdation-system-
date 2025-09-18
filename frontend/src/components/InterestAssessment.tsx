@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { BookOpen, Target, TrendingUp, Clock, CheckCircle } from 'lucide-react';
 
 interface Domain {
   id: string;
@@ -35,6 +34,10 @@ export interface UserAssessment {
   selectedDomain: string;
   selectedSubdomain: string;
   interests: string[];
+  specificTechnologies: string[];
+  learningStyles: string[];
+  projectTypes: string[];
+  currentSkills: string[];
   experienceLevel: 'beginner' | 'intermediate' | 'advanced';
   timeCommitment: 'part-time' | 'full-time' | 'flexible';
   learningGoals: string[];
@@ -231,6 +234,10 @@ export const InterestAssessment: React.FC<InterestAssessmentProps> = ({ onComple
   const [selectedDomain, setSelectedDomain] = useState<string>('');
   const [selectedSubdomain, setSelectedSubdomain] = useState<string>('');
   const [interests, setInterests] = useState<string[]>([]);
+  const [specificTechnologies, setSpecificTechnologies] = useState<string[]>([]);
+  const [learningStyles, setLearningStyles] = useState<string[]>([]);
+  const [projectTypes, setProjectTypes] = useState<string[]>([]);
+  const [currentSkills, setCurrentSkills] = useState<string[]>([]);
   const [experienceLevel, setExperienceLevel] = useState<'beginner' | 'intermediate' | 'advanced'>('beginner');
   const [timeCommitment, setTimeCommitment] = useState<'part-time' | 'full-time' | 'flexible'>('part-time');
   const [learningGoals, setLearningGoals] = useState<string[]>([]);
@@ -250,6 +257,90 @@ export const InterestAssessment: React.FC<InterestAssessmentProps> = ({ onComple
     'Build a portfolio'
   ];
 
+  // Domain-specific technology options
+  const getTechnologyOptions = () => {
+    const technologyMap: Record<string, string[]> = {
+      'web-development': [
+        'React', 'Vue.js', 'Angular', 'Node.js', 'Express.js', 'Python', 'Django', 
+        'Flask', 'JavaScript', 'TypeScript', 'HTML5', 'CSS3', 'Sass', 'Bootstrap', 
+        'Tailwind CSS', 'MongoDB', 'PostgreSQL', 'MySQL', 'Firebase', 'AWS', 'Docker'
+      ],
+      'data-science': [
+        'Python', 'R', 'SQL', 'Pandas', 'NumPy', 'Scikit-learn', 'TensorFlow', 
+        'PyTorch', 'Jupyter', 'Matplotlib', 'Seaborn', 'Tableau', 'Power BI', 
+        'Apache Spark', 'Hadoop', 'Excel', 'Statistics', 'Machine Learning', 'Deep Learning'
+      ],
+      'cybersecurity': [
+        'Kali Linux', 'Wireshark', 'Metasploit', 'Nmap', 'Burp Suite', 'OWASP', 
+        'Penetration Testing', 'Network Security', 'Cryptography', 'Incident Response', 
+        'SIEM', 'Compliance', 'Risk Assessment', 'Ethical Hacking', 'Malware Analysis'
+      ],
+      'digital-marketing': [
+        'Google Analytics', 'Google Ads', 'Facebook Ads', 'SEO', 'SEM', 'Content Marketing', 
+        'Email Marketing', 'Social Media Marketing', 'Marketing Automation', 'A/B Testing', 
+        'Conversion Optimization', 'Influencer Marketing', 'Affiliate Marketing'
+      ],
+      'product-management': [
+        'Agile', 'Scrum', 'Kanban', 'Jira', 'Confluence', 'User Research', 'Prototyping', 
+        'A/B Testing', 'Product Analytics', 'Roadmap Planning', 'Stakeholder Management', 
+        'Market Research', 'Competitive Analysis', 'Product Strategy'
+      ],
+      'ui-ux-design': [
+        'Figma', 'Sketch', 'Adobe XD', 'Photoshop', 'Illustrator', 'InVision', 
+        'Principle', 'Framer', 'User Research', 'Wireframing', 'Prototyping', 
+        'Design Systems', 'Usability Testing', 'Information Architecture'
+      ],
+      'content-creation': [
+        'Adobe Premiere Pro', 'Final Cut Pro', 'After Effects', 'Photoshop', 
+        'Canva', 'WordPress', 'SEO Writing', 'Copywriting', 'Video Production', 
+        'Photography', 'Social Media Strategy', 'Content Strategy', 'Storytelling'
+      ]
+    };
+    return technologyMap[selectedSubdomain] || [];
+  };
+
+  const learningStyleOptions = [
+    'Video tutorials', 'Interactive coding exercises', 'Reading documentation', 
+    'Hands-on projects', 'Live online classes', 'Self-paced courses', 
+    'Peer collaboration', 'Mentorship', 'Practice problems', 'Real-world case studies'
+  ];
+
+  const getProjectTypeOptions = () => {
+    const projectMap: Record<string, string[]> = {
+      'web-development': [
+        'E-commerce website', 'Social media app', 'Portfolio website', 'Blog platform', 
+        'REST API', 'Real-time chat app', 'Task management tool', 'Learning management system'
+      ],
+      'data-science': [
+        'Predictive modeling project', 'Data visualization dashboard', 'Recommendation system', 
+        'Natural language processing', 'Image classification', 'Time series analysis', 
+        'A/B testing analysis', 'Business intelligence report'
+      ],
+      'cybersecurity': [
+        'Network security assessment', 'Vulnerability scanner', 'Incident response plan', 
+        'Security awareness training', 'Penetration testing report', 'Security policy documentation'
+      ],
+      'digital-marketing': [
+        'SEO campaign', 'PPC advertising campaign', 'Content marketing strategy', 
+        'Social media campaign', 'Email marketing automation', 'Marketing analytics dashboard'
+      ],
+      'product-management': [
+        'Product roadmap', 'User research study', 'Feature prioritization framework', 
+        'Go-to-market strategy', 'Product metrics dashboard', 'User journey mapping'
+      ],
+      'ui-ux-design': [
+        'Mobile app design', 'Website redesign', 'Design system', 'User experience audit', 
+        'Prototype interactive interface', 'Usability testing plan'
+      ],
+      'content-creation': [
+        'Video content series', 'Social media content calendar', 'Blog content strategy', 
+        'Podcast series', 'Photography portfolio', 'Brand storytelling campaign'
+      ]
+    };
+    return projectMap[selectedSubdomain] || [];
+  };
+
+
   const handleInterestToggle = (interest: string) => {
     setInterests(prev => 
       prev.includes(interest) 
@@ -266,8 +357,33 @@ export const InterestAssessment: React.FC<InterestAssessmentProps> = ({ onComple
     );
   };
 
+  const handleTechnologyToggle = (tech: string) => {
+    setSpecificTechnologies(prev => 
+      prev.includes(tech) 
+        ? prev.filter(t => t !== tech)
+        : [...prev, tech]
+    );
+  };
+
+  const handleLearningStyleToggle = (style: string) => {
+    setLearningStyles(prev => 
+      prev.includes(style) 
+        ? prev.filter(s => s !== style)
+        : [...prev, style]
+    );
+  };
+
+  const handleProjectTypeToggle = (project: string) => {
+    setProjectTypes(prev => 
+      prev.includes(project) 
+        ? prev.filter(p => p !== project)
+        : [...prev, project]
+    );
+  };
+
+
   const handleNext = () => {
-    if (currentStep < 6) {
+    if (currentStep < 9) {
       setCurrentStep(currentStep + 1);
     }
   };
@@ -283,6 +399,10 @@ export const InterestAssessment: React.FC<InterestAssessmentProps> = ({ onComple
       selectedDomain,
       selectedSubdomain,
       interests,
+      specificTechnologies,
+      learningStyles,
+      projectTypes,
+      currentSkills,
       experienceLevel,
       timeCommitment,
       learningGoals
@@ -295,9 +415,12 @@ export const InterestAssessment: React.FC<InterestAssessmentProps> = ({ onComple
       case 1: return selectedDomain !== '';
       case 2: return selectedSubdomain !== '';
       case 3: return interests.length >= 3;
-      case 4: return experienceLevel !== '';
-      case 5: return timeCommitment !== '';
-      case 6: return learningGoals.length >= 1;
+      case 4: return specificTechnologies.length >= 2;
+      case 5: return learningStyles.length >= 2;
+      case 6: return projectTypes.length >= 1;
+      case 7: return experienceLevel !== '';
+      case 8: return timeCommitment !== '';
+      case 9: return learningGoals.length >= 1;
       default: return false;
     }
   };
@@ -394,7 +517,83 @@ export const InterestAssessment: React.FC<InterestAssessmentProps> = ({ onComple
     </div>
   );
 
+
   const renderStep4 = () => (
+    <div className="space-y-6">
+      <div className="text-center mb-8">
+        <h2 className="text-3xl font-bold text-gray-900 mb-4">What Technologies Do You Want to Learn?</h2>
+        <p className="text-gray-600">Select at least 2 specific technologies or tools for {selectedSubdomain}</p>
+      </div>
+      
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        {getTechnologyOptions().map((tech) => (
+          <button
+            key={tech}
+            onClick={() => handleTechnologyToggle(tech)}
+            className={`p-3 rounded-lg border-2 transition-all ${
+              specificTechnologies.includes(tech)
+                ? 'border-primary-500 bg-primary-100 text-primary-700'
+                : 'border-gray-200 hover:border-gray-300'
+            }`}
+          >
+            {tech}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderStep5 = () => (
+    <div className="space-y-6">
+      <div className="text-center mb-8">
+        <h2 className="text-3xl font-bold text-gray-900 mb-4">How Do You Prefer to Learn?</h2>
+        <p className="text-gray-600">Select at least 2 learning styles that work best for you</p>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {learningStyleOptions.map((style) => (
+          <button
+            key={style}
+            onClick={() => handleLearningStyleToggle(style)}
+            className={`p-4 rounded-lg border-2 transition-all text-left ${
+              learningStyles.includes(style)
+                ? 'border-primary-500 bg-primary-100 text-primary-700'
+                : 'border-gray-200 hover:border-gray-300'
+            }`}
+          >
+            {style}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderStep6 = () => (
+    <div className="space-y-6">
+      <div className="text-center mb-8">
+        <h2 className="text-3xl font-bold text-gray-900 mb-4">What Types of Projects Interest You?</h2>
+        <p className="text-gray-600">Select at least 1 type of project you'd like to build</p>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {getProjectTypeOptions().map((project) => (
+          <button
+            key={project}
+            onClick={() => handleProjectTypeToggle(project)}
+            className={`p-4 rounded-lg border-2 transition-all text-left ${
+              projectTypes.includes(project)
+                ? 'border-primary-500 bg-primary-100 text-primary-700'
+                : 'border-gray-200 hover:border-gray-300'
+            }`}
+          >
+            {project}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderStep7 = () => (
     <div className="space-y-6">
       <div className="text-center mb-8">
         <h2 className="text-3xl font-bold text-gray-900 mb-4">What's Your Experience Level?</h2>
@@ -424,7 +623,7 @@ export const InterestAssessment: React.FC<InterestAssessmentProps> = ({ onComple
     </div>
   );
 
-  const renderStep5 = () => (
+  const renderStep8 = () => (
     <div className="space-y-6">
       <div className="text-center mb-8">
         <h2 className="text-3xl font-bold text-gray-900 mb-4">How Much Time Can You Commit?</h2>
@@ -459,7 +658,7 @@ export const InterestAssessment: React.FC<InterestAssessmentProps> = ({ onComple
     </div>
   );
 
-  const renderStep6 = () => (
+  const renderStep9 = () => (
     <div className="space-y-6">
       <div className="text-center mb-8">
         <h2 className="text-3xl font-bold text-gray-900 mb-4">What Are Your Learning Goals?</h2>
@@ -492,6 +691,9 @@ export const InterestAssessment: React.FC<InterestAssessmentProps> = ({ onComple
       case 4: return renderStep4();
       case 5: return renderStep5();
       case 6: return renderStep6();
+      case 7: return renderStep7();
+      case 8: return renderStep8();
+      case 9: return renderStep9();
       default: return null;
     }
   };
@@ -502,13 +704,13 @@ export const InterestAssessment: React.FC<InterestAssessmentProps> = ({ onComple
         {/* Progress Bar */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-700">Step {currentStep} of 6</span>
-            <span className="text-sm text-gray-500">{Math.round((currentStep / 6) * 100)}% Complete</span>
+            <span className="text-sm font-medium text-gray-700">Step {currentStep} of 9</span>
+            <span className="text-sm text-gray-500">{Math.round((currentStep / 9) * 100)}% Complete</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
             <div 
               className="bg-primary-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${(currentStep / 6) * 100}%` }}
+              style={{ width: `${(currentStep / 9) * 100}%` }}
             ></div>
           </div>
         </div>
@@ -528,7 +730,7 @@ export const InterestAssessment: React.FC<InterestAssessmentProps> = ({ onComple
             Back
           </button>
           
-          {currentStep < 6 ? (
+          {currentStep < 9 ? (
             <button
               onClick={handleNext}
               disabled={!canProceed()}
