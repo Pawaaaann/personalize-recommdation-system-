@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Login } from './components/Login';
 import { Dashboard } from './components/Dashboard';
@@ -24,7 +24,7 @@ function AppContent() {
         try {
           const assessment = JSON.parse(savedAssessment);
           setUserAssessment(assessment);
-          setCurrentView('careers'); // Existing user: go to recommendations (history)
+          setCurrentView('dashboard'); // Existing user: go to dashboard
         } catch (error) {
           console.error('Failed to parse saved assessment:', error);
           setCurrentView('assessment'); // Fallback to assessment if data is corrupted
