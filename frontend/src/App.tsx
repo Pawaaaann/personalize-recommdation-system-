@@ -18,7 +18,10 @@ function AppContent() {
 
   useEffect(() => {
     if (currentUser && !loading) {
-      // Check if user has existing assessment
+      // Always route authenticated users to dashboard first
+      setCurrentView('dashboard');
+      
+      // Try to load saved assessment data if available
       const assessmentKey = `assessment_${currentUser.uid}`;
       const savedAssessment = localStorage.getItem(assessmentKey);
       
@@ -26,24 +29,14 @@ function AppContent() {
         try {
           const assessment = JSON.parse(savedAssessment);
           setUserAssessment(assessment);
-          setCurrentView('dashboard'); // Existing user: go to dashboard
         } catch (error) {
           console.error('Failed to parse saved assessment:', error);
-          setCurrentView('assessment'); // Fallback to assessment if data is corrupted
+          // Clear corrupted data
+          localStorage.removeItem(assessmentKey);
+          setUserAssessment(null);
         }
       } else {
-        // For existing users without saved assessment data, check if they're returning users
-        // If user has displayName or email, they might be existing users - send to dashboard
-        const hasCompletedAssessmentBefore = localStorage.getItem(`user_has_assessment_${currentUser.uid}`);
-        
-        if (hasCompletedAssessmentBefore) {
-          // User has completed assessment before but localStorage was cleared
-          // Take them to dashboard with a notice that they can retake assessment
-          setCurrentView('dashboard');
-        } else {
-          // Truly new user: go to assessment
-          setCurrentView('assessment');
-        }
+        setUserAssessment(null);
       }
     } else if (!currentUser && !loading) {
       setCurrentView('login'); // Not logged in: show login
@@ -57,8 +50,6 @@ function AppContent() {
     // Save assessment for the current user
     if (currentUser) {
       localStorage.setItem(`assessment_${currentUser.uid}`, JSON.stringify(assessment));
-      // Set flag to remember this user has completed an assessment
-      localStorage.setItem(`user_has_assessment_${currentUser.uid}`, 'true');
     }
     setCurrentView('dashboard'); // After assessment, go to dashboard
   };
@@ -192,7 +183,12 @@ function AppContent() {
           />
         );
       case 'dashboard':
-        return <Dashboard studentId={currentUser?.uid || ''} onLogout={handleLogout} assessment={userAssessment} />;
+        return <Dashboard 
+          studentId={currentUser?.uid || ''} 
+          onLogout={handleLogout} 
+          assessment={userAssessment} 
+          onTakeAssessment={handleRetakeAssessment}
+        />;
       default:
         return <Login />;
     }

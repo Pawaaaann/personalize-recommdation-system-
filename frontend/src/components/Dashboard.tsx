@@ -309,9 +309,10 @@ interface DashboardProps {
   studentId: string;
   onLogout: () => void;
   assessment: UserAssessment | null;
+  onTakeAssessment: () => void;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ studentId, onLogout, assessment }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ studentId, onLogout, assessment, onTakeAssessment }) => {
   const [selectedCareerPath, setSelectedCareerPath] = useState<CareerPath | null>(null);
   const { currentUser } = useAuth();
 
@@ -350,13 +351,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ studentId, onLogout, asses
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="text-center">
           <div className="text-gray-400 text-6xl mb-4">📋</div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">No Assessment Found</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome Back!</h2>
           <p className="text-gray-600 mb-6">
-            Please complete your career assessment to see personalized recommendations.
+            Complete your career assessment to see personalized recommendations and get started.
           </p>
-          <button onClick={onLogout} className="btn-secondary">
-            Back to Login
-          </button>
+          <div className="flex gap-4 justify-center">
+            <button onClick={onTakeAssessment} className="bg-primary-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-700 transition-colors">
+              Take Assessment
+            </button>
+            <button onClick={onLogout} className="btn-secondary">
+              Logout
+            </button>
+          </div>
         </div>
       </div>
     );
