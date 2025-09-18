@@ -28,9 +28,13 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd frontend && npx vite --host 0.0.0.0 --port 5000"
+args = "./start-dev.sh"
 waitForPort = 5000
 
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 46385
+externalPort = 3000
