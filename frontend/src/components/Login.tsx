@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BookOpen, ArrowRight, Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { ArrowRight, Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 interface LoginProps {
@@ -257,43 +257,6 @@ export const Login: React.FC<LoginProps> = () => {
           </button>
         </div>
 
-        {/* Demo Mode */}
-        <div className="text-center pt-4 border-t border-gray-200">
-          <p className="text-xs text-gray-500 mb-2">Demo Mode Available</p>
-          <p className="text-xs text-gray-400">
-            You can also use the traditional student ID login below
-          </p>
-        </div>
-
-        {/* Traditional Student ID Login (Demo) */}
-        <div className="pt-4 border-t border-gray-200">
-          <form onSubmit={(e) => {
-            e.preventDefault();
-            // Demo mode - just show a message
-            alert('Demo mode: This would normally connect to the backend API');
-          }} className="space-y-4">
-            <div>
-              <label htmlFor="studentId" className="block text-sm font-medium text-gray-700 mb-1">
-                Student ID (Demo)
-              </label>
-              <input
-                id="studentId"
-                type="text"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your student ID"
-                className="input-field"
-                aria-describedby={error ? "studentId-error" : undefined}
-              />
-            </div>
-            <button
-              type="submit"
-              className="btn-secondary w-full flex items-center justify-center gap-2"
-            >
-              Get Recommendations (Demo)
-            </button>
-          </form>
-        </div>
       </div>
     </div>
   );
