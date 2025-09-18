@@ -6,6 +6,9 @@ export interface UserAssessmentData {
   interests: string[];
   skillLevel: string;
   careerGoals: string[];
+  domain?: string;
+  subdomain?: string;
+  experienceLevel?: string;
   completedAt: Date;
   recommendations?: any[];
 }

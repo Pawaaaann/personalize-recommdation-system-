@@ -182,12 +182,16 @@ export class HybridStorageService {
       const response = await fetch(`${this.config.apiBaseUrl}/api/users/${userId}/assessment`);
       if (response.ok) {
         const data = await response.json();
+        // Normalize backend response to canonical format
         return {
           userId,
           interests: data.interests || [],
-          skillLevel: data.skillLevel || 'beginner',
-          careerGoals: data.careerGoals || [],
-          completedAt: new Date(data.completedAt || Date.now()),
+          skillLevel: data.skill_level || data.skillLevel || 'beginner',
+          careerGoals: data.career_goals || data.careerGoals || [],
+          domain: data.domain,
+          subdomain: data.subdomain,
+          experienceLevel: data.experience_level || data.experienceLevel,
+          completedAt: new Date(data.completed_at || data.completedAt || Date.now()),
           recommendations: data.recommendations
         };
       }
@@ -216,13 +220,14 @@ export class HybridStorageService {
       const response = await fetch(`${this.config.apiBaseUrl}/api/gamification/stats/${userId}`);
       if (response.ok) {
         const data = await response.json();
+        // Normalize backend response to canonical format
         return {
           user_id: userId,
           level: data.level || 1,
-          xp: data.xp || 0,
-          total_courses_completed: data.total_courses_completed || 0,
-          streak_days: data.streak_days || 0,
-          badges: data.badges || [],
+          xp: data.total_xp || data.xp || 0,
+          total_courses_completed: data.courses_completed || data.total_courses_completed || 0,
+          streak_days: data.current_streak || data.streak_days || 0,
+          badges: data.earned_badges || data.badges || [],
           last_activity: data.last_activity ? new Date(data.last_activity) : undefined
         };
       }
@@ -258,8 +263,6 @@ export class HybridStorageService {
 
 // Default hybrid storage instance
 export const hybridStorage = new HybridStorageService({
-  apiBaseUrl: process.env.NODE_ENV === 'development' 
-    ? 'http://localhost:8000' 
-    : window.location.origin,
+  apiBaseUrl: window.location.origin, // Use the same origin for both dev and prod
   enableAutoMigration: true
 });

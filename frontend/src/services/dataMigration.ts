@@ -201,19 +201,21 @@ export class DataMigrationService {
   // Private helper methods
   private async getAssessmentFromBackend(userId: string): Promise<UserAssessmentData | null> {
     try {
-      const apiBaseUrl = process.env.NODE_ENV === 'development' 
-        ? 'http://localhost:8000' 
-        : window.location.origin;
+      const apiBaseUrl = window.location.origin;
       
       const response = await fetch(`${apiBaseUrl}/api/users/${userId}/assessment`);
       if (response.ok) {
         const data = await response.json();
+        // Normalize backend response to canonical format
         return {
           userId,
           interests: data.interests || [],
-          skillLevel: data.skillLevel || 'beginner',
-          careerGoals: data.careerGoals || [],
-          completedAt: new Date(data.completedAt || Date.now()),
+          skillLevel: data.skill_level || data.skillLevel || 'beginner',
+          careerGoals: data.career_goals || data.careerGoals || [],
+          domain: data.domain,
+          subdomain: data.subdomain,
+          experienceLevel: data.experience_level || data.experienceLevel,
+          completedAt: new Date(data.completed_at || data.completedAt || Date.now()),
           recommendations: data.recommendations
         };
       }
@@ -226,20 +228,19 @@ export class DataMigrationService {
 
   private async getStatsFromBackend(userId: string): Promise<UserStats | null> {
     try {
-      const apiBaseUrl = process.env.NODE_ENV === 'development' 
-        ? 'http://localhost:8000' 
-        : window.location.origin;
+      const apiBaseUrl = window.location.origin;
       
       const response = await fetch(`${apiBaseUrl}/api/gamification/stats/${userId}`);
       if (response.ok) {
         const data = await response.json();
+        // Normalize backend response to canonical format
         return {
           user_id: userId,
           level: data.level || 1,
-          xp: data.xp || 0,
-          total_courses_completed: data.total_courses_completed || 0,
-          streak_days: data.streak_days || 0,
-          badges: data.badges || [],
+          xp: data.total_xp || data.xp || 0,
+          total_courses_completed: data.courses_completed || data.total_courses_completed || 0,
+          streak_days: data.current_streak || data.streak_days || 0,
+          badges: data.earned_badges || data.badges || [],
           last_activity: data.last_activity ? new Date(data.last_activity) : undefined
         };
       }
@@ -252,9 +253,7 @@ export class DataMigrationService {
 
   private async getAllUserIdsFromBackend(): Promise<string[]> {
     try {
-      const apiBaseUrl = process.env.NODE_ENV === 'development' 
-        ? 'http://localhost:8000' 
-        : window.location.origin;
+      const apiBaseUrl = window.location.origin;
 
       // Try to get user IDs from gamification stats endpoint
       const response = await fetch(`${apiBaseUrl}/api/gamification/all-users`);

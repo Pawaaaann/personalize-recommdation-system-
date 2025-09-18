@@ -7,6 +7,7 @@ import { CareerRecommendations } from './components/CareerRecommendations';
 import { InterestBasedRecommendations } from './components/InterestBasedRecommendations';
 import { LearningPath } from './components/LearningPath';
 import { UserAssessment } from './components/InterestAssessment';
+import { hybridStorage } from './services/hybridStorage';
 
 type AppView = 'login' | 'assessment' | 'careers' | 'course-recommendations' | 'learning-path' | 'dashboard';
 
@@ -17,53 +18,114 @@ function AppContent() {
   const [selectedCareerPath, setSelectedCareerPath] = useState<string>('');
 
   useEffect(() => {
-    if (currentUser && !loading) {
-      // Check for saved assessment data first
-      const assessmentKey = `assessment_${currentUser.uid}`;
-      const savedAssessment = localStorage.getItem(assessmentKey);
-      
-      if (savedAssessment) {
+    const loadUserAssessment = async () => {
+      if (currentUser && !loading) {
         try {
-          const assessment = JSON.parse(savedAssessment);
-          setUserAssessment(assessment);
-          setCurrentView('careers'); // Existing user with data: go to career recommendations
+          console.log('Loading assessment data for user:', currentUser.uid);
+          
+          // Check for assessment data using hybrid storage (Firebase + backend)
+          const assessmentData = await hybridStorage.getUserAssessment(currentUser.uid);
+          
+          if (assessmentData) {
+            console.log('Found existing assessment data:', assessmentData);
+            // Convert canonical UserAssessmentData to UserAssessment interface format
+            const assessment: UserAssessment = {
+              selectedDomain: assessmentData.domain || '',
+              selectedSubdomain: assessmentData.subdomain || '', 
+              interests: assessmentData.interests || [],
+              specificTechnologies: [], // Map from backend data if available
+              learningStyles: [], // Map from backend data if available
+              projectTypes: [], // Map from backend data if available
+              currentSkills: [], // Map from backend data if available
+              experienceLevel: assessmentData.skillLevel as 'beginner' | 'intermediate' | 'advanced' || 'beginner',
+              timeCommitment: 'part-time', // Default value
+              learningGoals: assessmentData.careerGoals || []
+            };
+            
+            setUserAssessment(assessment);
+            setCurrentView('careers'); // Existing user with data: go to career recommendations
+          } else {
+            // No assessment data found - check localStorage for legacy data
+            const assessmentKey = `assessment_${currentUser.uid}`;
+            const savedAssessment = localStorage.getItem(assessmentKey);
+            
+            if (savedAssessment) {
+              try {
+                const localAssessment = JSON.parse(savedAssessment);
+                console.log('Found legacy localStorage assessment, migrating to hybrid storage');
+                setUserAssessment(localAssessment);
+                
+                // Migrate localStorage data to hybrid storage
+                await handleAssessmentComplete(localAssessment, false); // false = don't update view again
+                
+                setCurrentView('careers');
+              } catch (error) {
+                console.error('Failed to parse saved localStorage assessment:', error);
+                localStorage.removeItem(assessmentKey);
+                setUserAssessment(null);
+                setCurrentView('assessment');
+              }
+            } else {
+              // No data found anywhere - new user needs assessment
+              console.log('No assessment data found, directing to assessment');
+              setUserAssessment(null);
+              setCurrentView('assessment');
+            }
+          }
         } catch (error) {
-          console.error('Failed to parse saved assessment:', error);
-          // Clear corrupted data
-          localStorage.removeItem(assessmentKey);
-          setUserAssessment(null);
-          setCurrentView('assessment'); // Corrupted data: retake assessment
-        }
-      } else {
-        // Check if this is likely an existing user (has profile info from Google/other providers)
-        const isLikelyExistingUser = currentUser.displayName || 
-                                   (currentUser.email && !currentUser.email.includes('test')) ||
-                                   currentUser.photoURL;
-        
-        if (isLikelyExistingUser) {
-          // Existing user without saved assessment data - go to careers with empty assessment
-          setUserAssessment(null);
-          setCurrentView('careers');
-        } else {
-          // Truly new user: go to assessment
+          console.error('Error loading user assessment:', error);
+          // Fallback to assessment if there's an error
           setUserAssessment(null);
           setCurrentView('assessment');
         }
+      } else if (!currentUser && !loading) {
+        setCurrentView('login'); // Not logged in: show login
       }
-    } else if (!currentUser && !loading) {
-      setCurrentView('login'); // Not logged in: show login
-    }
+    };
+
+    loadUserAssessment();
   }, [currentUser, loading]);
 
 
 
-  const handleAssessmentComplete = (assessment: UserAssessment) => {
+  const handleAssessmentComplete = async (assessment: UserAssessment, shouldUpdateView: boolean = true) => {
     setUserAssessment(assessment);
-    // Save assessment for the current user
+    
+    // Save assessment using hybrid storage (Firebase + backend)
     if (currentUser) {
-      localStorage.setItem(`assessment_${currentUser.uid}`, JSON.stringify(assessment));
+      try {
+        console.log('Saving assessment data for user:', currentUser.uid);
+        
+        // Convert to canonical UserAssessmentData format
+        const assessmentData = {
+          userId: currentUser.uid,
+          interests: assessment.interests,
+          skillLevel: assessment.experienceLevel,
+          careerGoals: assessment.learningGoals,
+          domain: assessment.selectedDomain,
+          subdomain: assessment.selectedSubdomain,
+          experienceLevel: assessment.experienceLevel,
+          completedAt: new Date(),
+          recommendations: []
+        };
+        
+        // Save using hybrid storage (will save to both Firebase and backend)
+        await hybridStorage.saveUserAssessment(currentUser.uid, assessmentData);
+        
+        // Keep localStorage for backward compatibility during transition
+        localStorage.setItem(`assessment_${currentUser.uid}`, JSON.stringify(assessment));
+        
+        console.log('Assessment data saved successfully');
+      } catch (error) {
+        console.error('Error saving assessment data:', error);
+        // Still save to localStorage as fallback
+        localStorage.setItem(`assessment_${currentUser.uid}`, JSON.stringify(assessment));
+      }
     }
-    setCurrentView('dashboard'); // After assessment, go to dashboard
+    
+    if (shouldUpdateView) {
+      setCurrentView('dashboard'); // After assessment, go to dashboard
+    }
   };
 
   const handleViewLearningPath = (careerPath: string) => {
