@@ -21,8 +21,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 // Initialize Analytics only if supported (prevents errors in development)
-let analytics = null;
-isSupported().then(yes => yes ? analytics = getAnalytics(app) : null);
+isSupported().then(yes => yes ? getAnalytics(app) : null);
 
 // Initialize Firebase Authentication and get a reference to the service
 export const auth = getAuth(app);
