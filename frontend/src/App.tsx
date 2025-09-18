@@ -144,48 +144,10 @@ function AppContent() {
                 </div>
               </div>
             </div>
-            {userAssessment ? (
-              <CareerRecommendations 
-                assessment={userAssessment} 
-                onViewLearningPath={handleViewLearningPath} 
-              />
-            ) : (
-              <div className="max-w-6xl mx-auto px-4 py-8">
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-6 mb-6">
-                  <h3 className="text-lg font-semibold text-amber-900 mb-2">⚠️ Assessment Data Not Found</h3>
-                  <p className="text-amber-800 mb-4">
-                    We couldn't find your previous assessment results. This might happen if you've cleared your browser data or are using a different device.
-                    <br /><br />
-                    <strong>To restore your personalized recommendations:</strong>
-                  </p>
-                  <button
-                    onClick={handleRetakeAssessment}
-                    className="bg-amber-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-amber-700 transition-colors"
-                  >
-                    Retake Assessment (5 minutes)
-                  </button>
-                </div>
-                
-                {/* Show sample career paths */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <div className="bg-white rounded-lg shadow-sm border p-6">
-                    <h4 className="font-semibold text-gray-900 mb-2">Web Development</h4>
-                    <p className="text-gray-600 text-sm mb-3">Build modern web applications and user interfaces</p>
-                    <div className="text-sm text-gray-500">Popular career paths available</div>
-                  </div>
-                  <div className="bg-white rounded-lg shadow-sm border p-6">
-                    <h4 className="font-semibold text-gray-900 mb-2">Data Science</h4>
-                    <p className="text-gray-600 text-sm mb-3">Analyze data and build machine learning models</p>
-                    <div className="text-sm text-gray-500">Popular career paths available</div>
-                  </div>
-                  <div className="bg-white rounded-lg shadow-sm border p-6">
-                    <h4 className="font-semibold text-gray-900 mb-2">Mobile Development</h4>
-                    <p className="text-gray-600 text-sm mb-3">Create mobile apps for iOS and Android</p>
-                    <div className="text-sm text-gray-500">Popular career paths available</div>
-                  </div>
-                </div>
-              </div>
-            )}
+            <CareerRecommendations 
+              assessment={userAssessment} 
+              onViewLearningPath={handleViewLearningPath} 
+            />
           </div>
         );
       case 'course-recommendations':

@@ -3,7 +3,7 @@ import { Target, Clock, TrendingUp, DollarSign, BookOpen, Calendar, Star, Extern
 import { UserAssessment } from './InterestAssessment';
 
 interface CareerRecommendationsProps {
-  assessment: UserAssessment;
+  assessment: UserAssessment | null;
   onViewLearningPath: (careerPath: string) => void;
 }
 
@@ -395,15 +395,23 @@ export const CareerRecommendations: React.FC<CareerRecommendationsProps> = ({
   const [selectedCareerPath, setSelectedCareerPath] = useState<string>('');
 
   // Strictly use the selected subdomain's career paths
-  const availableCareerPaths = CAREER_PATHS[assessment.selectedSubdomain] || [];
+  // Add fallback for cases where selectedSubdomain might be undefined or empty
+  const selectedSubdomain = assessment?.selectedSubdomain || '';
+  let availableCareerPaths = CAREER_PATHS[selectedSubdomain] || [];
+  
+  // If no career paths found for the selected subdomain, show paths from all domains
+  if (availableCareerPaths.length === 0) {
+    availableCareerPaths = Object.values(CAREER_PATHS).flat();
+  }
 
   // Dynamic scoring: boost by interests overlap and experience fit
-  const normalizedInterests = assessment.interests.map(i => i.toLowerCase());
+  const normalizedInterests = (assessment?.interests || []).map(i => i.toLowerCase());
   const experienceWeight = (difficulty: CareerPath['difficulty']) => {
-    if (assessment.experienceLevel === 'beginner') {
+    const userLevel = assessment?.experienceLevel || 'beginner';
+    if (userLevel === 'beginner') {
       return difficulty === 'beginner' ? 10 : difficulty === 'intermediate' ? 0 : -10;
     }
-    if (assessment.experienceLevel === 'intermediate') {
+    if (userLevel === 'intermediate') {
       return difficulty === 'beginner' ? 5 : difficulty === 'intermediate' ? 10 : 0;
     }
     // advanced
@@ -423,8 +431,9 @@ export const CareerRecommendations: React.FC<CareerRecommendationsProps> = ({
 
   const filteredCareerPaths = availableCareerPaths
     .filter(path => {
-      if (assessment.experienceLevel === 'beginner') return path.difficulty !== 'advanced';
-      if (assessment.experienceLevel === 'intermediate') return path.difficulty !== 'advanced' || true;
+      const userLevel = assessment?.experienceLevel || 'beginner';
+      if (userLevel === 'beginner') return path.difficulty !== 'advanced';
+      if (userLevel === 'intermediate') return path.difficulty !== 'advanced' || true;
       return true;
     })
     .sort((a, b) => computeSortScore(b) - computeSortScore(a))
@@ -464,21 +473,20 @@ export const CareerRecommendations: React.FC<CareerRecommendationsProps> = ({
             Your Career Path Recommendations
           </h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Based on your interests in <strong>{assessment.selectedDomain}</strong> and 
-            <strong> {assessment.selectedSubdomain}</strong>, here are the best career paths for you
+            {assessment?.selectedDomain && assessment?.selectedSubdomain ? (
+              <>Based on your interests in <strong>{assessment.selectedDomain}</strong> and 
+              <strong> {assessment.selectedSubdomain}</strong>, here are the best career paths for you</>
+            ) : (
+              <>Explore these career paths across all domains to find what interests you most</>
+            )}
           </p>
           <p className="text-lg text-gray-500 mt-2">
-            Showing {filteredCareerPaths.length} personalized recommendations
+            Showing {filteredCareerPaths.length} {assessment?.selectedDomain ? 'personalized ' : ''}recommendations
           </p>
         </div>
 
         {/* Career Paths */}
         <div className="space-y-6">
-          {filteredCareerPaths.length === 0 && (
-            <div className="bg-white rounded-xl p-6 text-center text-gray-600">
-              No career paths configured yet for this subdomain. Please select a different subdomain or retake the assessment.
-            </div>
-          )}
           {filteredCareerPaths.map((careerPath) => (
             <div key={careerPath.id} className="bg-white rounded-xl shadow-lg overflow-hidden">
               <div className="p-6">
