@@ -151,16 +151,18 @@ function AppContent() {
               />
             ) : (
               <div className="max-w-6xl mx-auto px-4 py-8">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
-                  <h3 className="text-lg font-semibold text-blue-900 mb-2">Complete Your Assessment</h3>
-                  <p className="text-blue-800 mb-4">
-                    To see personalized career recommendations, please complete your career assessment first.
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-6 mb-6">
+                  <h3 className="text-lg font-semibold text-amber-900 mb-2">⚠️ Assessment Data Not Found</h3>
+                  <p className="text-amber-800 mb-4">
+                    We couldn't find your previous assessment results. This might happen if you've cleared your browser data or are using a different device.
+                    <br /><br />
+                    <strong>To restore your personalized recommendations:</strong>
                   </p>
                   <button
                     onClick={handleRetakeAssessment}
-                    className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                    className="bg-amber-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-amber-700 transition-colors"
                   >
-                    Take Assessment
+                    Retake Assessment (5 minutes)
                   </button>
                 </div>
                 
@@ -219,16 +221,18 @@ function AppContent() {
               <InterestBasedRecommendations assessment={userAssessment} />
             ) : (
               <div className="max-w-6xl mx-auto px-4 py-8">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
-                  <h3 className="text-lg font-semibold text-blue-900 mb-2">Complete Your Assessment</h3>
-                  <p className="text-blue-800 mb-4">
-                    To see personalized course recommendations, please complete your career assessment first.
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-6 mb-6">
+                  <h3 className="text-lg font-semibold text-amber-900 mb-2">⚠️ Assessment Data Not Found</h3>
+                  <p className="text-amber-800 mb-4">
+                    We couldn't find your previous assessment results. This might happen if you've cleared your browser data or are using a different device.
+                    <br /><br />
+                    <strong>To restore your personalized course recommendations:</strong>
                   </p>
                   <button
                     onClick={handleRetakeAssessment}
-                    className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                    className="bg-amber-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-amber-700 transition-colors"
                   >
-                    Take Assessment
+                    Retake Assessment (5 minutes)
                   </button>
                 </div>
                 
