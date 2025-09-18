@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Target, Clock, TrendingUp, DollarSign, BookOpen, Calendar, Star, ExternalLink } from 'lucide-react';
+import { Clock, TrendingUp, DollarSign, BookOpen, Star, ExternalLink } from 'lucide-react';
 import { UserAssessment } from './InterestAssessment';
 
 interface CareerRecommendationsProps {
