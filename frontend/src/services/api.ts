@@ -27,7 +27,7 @@ export const api = {
     domain?: string, 
     subdomain?: string, 
     experienceLevel?: string, 
-    nRecommendations: number = 5
+    nRecommendations: number = 10
   ): Promise<RecommendationResponse[]> {
     const response = await fetch(`${API_BASE_URL}/recommendations/interest-based`, {
       method: 'POST',

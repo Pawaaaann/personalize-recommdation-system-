@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { BookOpen, Clock, Star, Target, TrendingUp, ExternalLink, Loader2 } from 'lucide-react';
+import { BookOpen, Clock, Star, Target, TrendingUp, Loader2 } from 'lucide-react';
 import { UserAssessment } from './InterestAssessment';
 import { api } from '../services/api';
-import { RecommendationResponse, CourseMetadata } from '../types/api';
+import { CourseMetadata } from '../types/api';
 
 interface InterestBasedRecommendationsProps {
   assessment: UserAssessment;
@@ -32,7 +32,7 @@ export const InterestBasedRecommendations: React.FC<InterestBasedRecommendations
       setLoading(true);
       setError(null);
       
-      // Get at least 5 recommendations based on comprehensive user profile
+      // Get 8-10 recommendations based on comprehensive user profile to give users more choices
       const allPreferences = [
         ...(assessment.interests || []),
         ...(assessment.specificTechnologies || []),
@@ -47,7 +47,7 @@ export const InterestBasedRecommendations: React.FC<InterestBasedRecommendations
         assessment.selectedDomain,
         assessment.selectedSubdomain,
         assessment.experienceLevel,
-        5
+        10
       );
 
       // Fetch course metadata in parallel for better performance
@@ -106,10 +106,10 @@ export const InterestBasedRecommendations: React.FC<InterestBasedRecommendations
         courseRecommendations.push(...realCourseRecs);
       }
 
-      // Sort by score and ensure we have at least 4 recommendations
+      // Sort by score and ensure we have at least 8 recommendations for better variety
       courseRecommendations.sort((a, b) => b.score - a.score);
       
-      if (courseRecommendations.length < 4) {
+      if (courseRecommendations.length < 8) {
         // If we don't have enough, add some fallback recommendations
         const fallbackCourses = [
           {
@@ -143,7 +143,7 @@ export const InterestBasedRecommendations: React.FC<InterestBasedRecommendations
         courseRecommendations.push(...fallbackCourses);
       }
 
-      setRecommendations(courseRecommendations.slice(0, 5)); // Ensure exactly 5 recommendations
+      setRecommendations(courseRecommendations.slice(0, 10)); // Show up to 10 recommendations for better choice
       
     } catch (err) {
       setError('Failed to fetch recommendations. Please try again.');
@@ -302,7 +302,7 @@ export const InterestBasedRecommendations: React.FC<InterestBasedRecommendations
                       </div>
                       <div className="flex items-center gap-2">
                         <Target className="h-5 w-5 text-gray-400" />
-                        <span className={`text-sm font-medium ${getDifficultyColor(rec.course.difficulty)}`}>
+                        <span className={`text-sm font-medium ${getDifficultyColor(rec.course.difficulty || '')}`}>
                           {rec.course.difficulty || 'Not specified'}
                         </span>
                       </div>

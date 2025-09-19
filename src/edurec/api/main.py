@@ -22,41 +22,9 @@ from ..data.data_loader import DataLoader
 from ..monitoring.metrics import get_metrics_collector
 from ..monitoring.ab_testing import get_ab_test_manager
 from ..gamification.engine import GamificationEngine
-from ..gamification.badge_definitions import get_all_badges
+from ..gamification.badge_definitions import get_all_badges as get_all_badge_definitions
 
-# Initialize FastAPI app
-app = FastAPI(
-    title="Educational Recommendation System API",
-    description="API for personalized course recommendations",
-    version="1.0.0"
-)
-
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Request monitoring middleware
-@app.middleware("http")
-async def monitor_requests(request: Request, call_next):
-    """Middleware to monitor request latencies and counts."""
-    start_time = time.time()
-    
-    response = await call_next(request)
-    
-    duration = time.time() - start_time
-    endpoint = request.url.path
-    method = request.method
-    status = str(response.status_code)
-    
-    # Record metrics
-    metrics_collector.record_request(endpoint, method, duration, status)
-    
-    return response
+# FastAPI app will be initialized later with lifespan
 
 # Pydantic models
 class InteractionEvent(BaseModel):
@@ -70,7 +38,7 @@ class InterestBasedRecommendationRequest(BaseModel):
     domain: Optional[str] = Field(None, description="User's selected domain")
     subdomain: Optional[str] = Field(None, description="User's selected subdomain")
     experience_level: Optional[str] = Field(None, description="User's experience level")
-    n_recommendations: int = Field(5, ge=4, le=20, description="Number of recommendations (minimum 4)")
+    n_recommendations: int = Field(10, ge=4, le=20, description="Number of recommendations (default 10, minimum 4)")
 
 class RecommendationResponse(BaseModel):
     course_id: str = Field(..., description="Course identifier")
@@ -202,7 +170,7 @@ def load_models_and_data():
             metrics_collector.set_total_courses(len(courses_df))
         if interactions_df is not None:
             unique_users = interactions_df['student_id'].nunique()
-            metrics_collector.set_active_users(unique_users)
+            metrics_collector.set_active_users(int(unique_users))
         
         # Load ALS model if available
         # als_model_path = MODELS_DIR / "als_model.pkl"
@@ -268,6 +236,33 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Request monitoring middleware
+@app.middleware("http")
+async def monitor_requests(request: Request, call_next):
+    """Middleware to monitor request latencies and counts."""
+    start_time = time.time()
+    
+    response = await call_next(request)
+    
+    duration = time.time() - start_time
+    endpoint = request.url.path
+    method = request.method
+    status = str(response.status_code)
+    
+    # Record metrics
+    metrics_collector.record_request(endpoint, method, duration, status)
+    
+    return response
 
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
@@ -340,62 +335,120 @@ async def get_interest_based_recommendations(request: InterestBasedRecommendatio
         all_recommendations = []
         seen_courses = set()
         
-        # Strategy 1: Try content-based filtering with user interests
+        # Strategy 1: Enhanced content-based filtering with diversity
         try:
-            print(f"Attempting content-based recommendations with interests: {request.interests}")
+            print(f"Attempting enhanced content-based recommendations with interests: {request.interests}")
             
             # Import the content-based recommender directly
             from ..models.baseline import content_based_recommender
             
             # Use content-based recommender directly with user interests
+            if courses_df is None:
+                raise ValueError("Courses data not loaded")
+            
             query_text = " ".join(request.interests)
             content_course_ids = content_based_recommender(
-                courses_df, query_text=query_text, top_n=n_recs * 3
+                courses_df, query_text=query_text, top_n=n_recs * 4  # Get more for diversity
             )
             
             print(f"Content-based recommender returned {len(content_course_ids)} course IDs")
             
-            # Convert course IDs to recommendation format
+            # Add diversity by filtering for different difficulty levels and topics
+            difficulty_counts = {"beginner": 0, "intermediate": 0, "advanced": 0}
+            
+            # Convert course IDs to recommendation format with enhanced diversity
             for i, course_id in enumerate(content_course_ids):
-                if course_id not in seen_courses and len(all_recommendations) < n_recs:
-                    # Calculate score based on position (higher position = higher score)
-                    score = 1.0 - (i / len(content_course_ids))
-                    
-                    content_rec = {
-                        "item_id": course_id,
-                        "score": score,
-                        "explanations": ["Based on your interests", "Content-based match"]
-                    }
-                    all_recommendations.append(content_rec)
-                    seen_courses.add(course_id)
+                if course_id not in seen_courses and len(all_recommendations) < max(8, n_recs * 0.8):  # Take majority from content-based
+                    # Get course metadata for diversity analysis
+                    course_row = courses_df[courses_df['course_id'] == course_id]
+                    if not course_row.empty:
+                        course_data = course_row.iloc[0]
+                        
+                        # Determine difficulty level (basic heuristic based on course data)
+                        skill_tags = str(course_data.get('skill_tags', '').lower())
+                        if any(word in skill_tags for word in ['beginner', 'intro', 'basic', 'fundamental']):
+                            difficulty = 'beginner'
+                        elif any(word in skill_tags for word in ['advanced', 'expert', 'master', 'deep']):
+                            difficulty = 'advanced'
+                        else:
+                            difficulty = 'intermediate'
+                        
+                        # Ensure diversity across difficulty levels
+                        max_per_difficulty = max(2, n_recs // 4)  # At least 2 per level, or quarter of total
+                        if difficulty_counts.get(difficulty, 0) < max_per_difficulty:
+                            # Calculate enhanced score based on position and user level match
+                            base_score = 1.0 - (i / len(content_course_ids))
+                            
+                            # Boost score if difficulty matches user experience level
+                            if request.experience_level and difficulty.lower() in request.experience_level.lower():
+                                base_score = min(1.0, base_score * 1.2)
+                            
+                            # Enhanced explanations
+                            explanations = [f"Matches your interests: {', '.join(request.interests[:3])}"]
+                            if difficulty == 'beginner':
+                                explanations.append("Perfect for building foundational knowledge")
+                            elif difficulty == 'advanced':
+                                explanations.append("Advanced content to challenge your skills")
+                            else:
+                                explanations.append("Intermediate level to expand your expertise")
+                            
+                            content_rec = {
+                                "item_id": course_id,
+                                "score": base_score,
+                                "explanations": explanations
+                            }
+                            all_recommendations.append(content_rec)
+                            seen_courses.add(course_id)
+                            difficulty_counts[difficulty] = difficulty_counts.get(difficulty, 0) + 1
                     
         except Exception as e:
             print(f"Content-based recommendations failed: {e}")
             import traceback
             traceback.print_exc()
         
-        # Strategy 2: If we still need more, try popularity-based recommendations
+        # Strategy 2: Enhanced popularity-based recommendations with trending insights
         if len(all_recommendations) < n_recs:
             try:
-                print(f"Attempting popularity-based recommendations to get {n_recs - len(all_recommendations)} more")
+                print(f"Attempting enhanced popularity-based recommendations to get {n_recs - len(all_recommendations)} more")
                 
                 # Import the popularity recommender directly
                 from ..models.baseline import popularity_recommender
                 
                 # Use popularity recommender directly
-                pop_course_ids = popularity_recommender(interactions_df, n_recs * 2)
+                if interactions_df is None:
+                    raise ValueError("Interactions data not loaded")
+                
+                pop_course_ids = popularity_recommender(interactions_df, n_recs * 3)
                 print(f"Popularity-based recommender returned {len(pop_course_ids)} course IDs")
                 
-                # Add unique popularity-based recommendations
+                # Add unique popularity-based recommendations with enhanced explanations
                 for i, course_id in enumerate(pop_course_ids):
                     if course_id not in seen_courses and len(all_recommendations) < n_recs:
-                        # Calculate score based on popularity position
-                        score = 1.0 - (i / len(pop_course_ids))
+                        # Get interaction count for this course
+                        if interactions_df is not None:
+                            interaction_count = len(interactions_df[interactions_df['course_id'] == course_id])
+                        else:
+                            interaction_count = 100  # Default fallback
+                        
+                        # Calculate enhanced score
+                        base_score = max(0.4, 0.8 - (i / len(pop_course_ids)))  # Ensure minimum score
+                        
+                        # Enhanced explanations based on popularity metrics
+                        if i < 5:
+                            explanations = ["Top-rated course in your field", f"Chosen by {interaction_count}+ students"]
+                        elif i < 15:
+                            explanations = ["Highly popular course", "Great student reviews and engagement"]
+                        else:
+                            explanations = ["Well-regarded course", "Trusted by the learning community"]
+                        
+                        # Add domain-specific context if available
+                        if request.domain:
+                            explanations.append(f"Relevant to {request.domain} field")
                         
                         pop_rec = {
                             "item_id": course_id,
-                            "score": score,
-                            "explanations": ["Popular course", "Widely taken by students"]
+                            "score": base_score,
+                            "explanations": explanations
                         }
                         all_recommendations.append(pop_rec)
                         seen_courses.add(course_id)
@@ -405,32 +458,76 @@ async def get_interest_based_recommendations(request: InterestBasedRecommendatio
                 import traceback
                 traceback.print_exc()
         
-        # Strategy 3: If we still don't have enough, get random courses from the dataset
+        # Strategy 3: Curated exploration recommendations
         if len(all_recommendations) < n_recs:
             try:
-                print(f"Attempting to get {n_recs - len(all_recommendations)} random courses from dataset")
-                # Get random courses from the dataset
-                available_courses = courses_df[~courses_df['course_id'].isin(seen_courses)]
+                print(f"Attempting to get {n_recs - len(all_recommendations)} curated exploration courses")
+                if courses_df is None:
+                    raise ValueError("Courses data not loaded")
+                
+                # Get courses from the dataset that could expand user's horizons
+                available_courses = courses_df[~courses_df['course_id'].isin(list(seen_courses))]
                 if len(available_courses) > 0:
+                    # Prioritize courses that might introduce new skills or concepts
+                    domain_keywords = []
+                    if request.domain:
+                        domain_keywords = request.domain.lower().split()
+                    if request.subdomain:
+                        domain_keywords.extend(request.subdomain.lower().split())
+                    
+                    # Score courses based on potential learning value
                     sample_size = min(n_recs - len(all_recommendations), len(available_courses))
-                    sample_courses = available_courses.sample(sample_size)
                     
-                    for _, course_row in sample_courses.iterrows():
-                        if len(all_recommendations) < n_recs:
-                            synthetic_rec = {
-                                "item_id": course_row['course_id'],
-                                "score": 0.5,  # Default score for random recommendations
-                                "explanations": ["Course from your field", "Available in our catalog"]
-                            }
-                            all_recommendations.append(synthetic_rec)
-                            seen_courses.add(course_row['course_id'])
-                    
-                    print(f"Added {len(sample_courses)} random courses from dataset")
+                    if sample_size > 0:
+                        sample_courses = available_courses.sample(min(sample_size * 3, len(available_courses)))
+                        
+                        # Select courses with learning value scoring
+                        scored_courses = []
+                        for _, course_row in sample_courses.iterrows():
+                            skill_tags = str(course_row.get('skill_tags', '')).lower()
+                            title = str(course_row.get('title', '')).lower()
+                            
+                            # Score based on relevance and learning potential
+                            relevance_score = 0.3  # Base score
+                            
+                            # Boost score if related to user's domain
+                            for keyword in domain_keywords:
+                                if keyword in skill_tags or keyword in title:
+                                    relevance_score += 0.2
+                            
+                            # Boost for fundamental/foundational courses
+                            if any(word in skill_tags for word in ['fundamental', 'essential', 'core', 'foundation']):
+                                relevance_score += 0.15
+                            
+                            scored_courses.append((course_row, relevance_score))
+                        
+                        # Sort by relevance and take the best ones
+                        scored_courses.sort(key=lambda x: x[1], reverse=True)
+                        
+                        for course_row, relevance_score in scored_courses[:sample_size]:
+                            if len(all_recommendations) < n_recs:
+                                # Enhanced explanations for exploration courses
+                                explanations = ["Expand your skillset", "Discover new learning opportunities"]
+                                
+                                if relevance_score > 0.5:
+                                    explanations = ["Highly relevant to your goals", "Builds on your current interests"]
+                                elif relevance_score > 0.4:
+                                    explanations = ["Related to your field", "Could complement your skills"]
+                                
+                                exploration_rec = {
+                                    "item_id": course_row['course_id'],
+                                    "score": min(0.7, 0.3 + relevance_score),  # Cap at reasonable score
+                                    "explanations": explanations
+                                }
+                                all_recommendations.append(exploration_rec)
+                                seen_courses.add(course_row['course_id'])
+                        
+                        print(f"Added {len(scored_courses[:sample_size])} curated exploration courses")
             except Exception as e:
                 print(f"Random course sampling failed: {e}")
         
-        # Strategy 4: Ultimate fallback - create generic recommendations only if we have less than 4
-        if len(all_recommendations) < 4:
+        # Strategy 4: Ultimate fallback - create generic recommendations only if we have less than 6
+        if len(all_recommendations) < 6:
             print(f"Using generic fallback for {4 - len(all_recommendations)} recommendations")
             generic_courses = [
                 {
@@ -513,8 +610,11 @@ async def debug_recommendations():
         }
         
         if courses_df is not None and len(courses_df) > 0:
-            sample_courses = courses_df.head(3)[['course_id', 'title', 'skill_tags']].to_dict('records')
-            debug_info["sample_courses"] = sample_courses
+            try:
+                sample_courses = courses_df.head(3)[['course_id', 'title', 'skill_tags']].to_dict('records')
+                debug_info["sample_courses"] = sample_courses
+            except Exception as e:
+                debug_info["sample_courses_error"] = str(e)
         
         return debug_info
         
@@ -678,10 +778,10 @@ async def get_user_stats(user_id: str):
         raise HTTPException(status_code=500, detail="Failed to get user stats")
 
 @app.get("/gamification/badges", response_model=List[BadgeResponse])
-async def get_all_badges():
+async def get_all_badges_endpoint():
     """Get all available badges."""
     try:
-        badges = get_all_badges()
+        badges = get_all_badge_definitions()
         badge_list = []
         for badge_id, badge in badges.items():
             badge_list.append(BadgeResponse(
