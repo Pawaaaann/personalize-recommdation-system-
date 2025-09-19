@@ -235,7 +235,7 @@ const CAREER_PATHS: Record<string, CareerPath[]> = {
       skills: ['SEO', 'Social Media', 'Google Ads', 'Analytics', 'Content Marketing'],
       salaryRange: '$40K - $80K',
       growthPotential: 'high',
-      matchScore: 78,
+      matchScore: 85,
       learningPath: [
         {
           phase: 'Digital Marketing Fundamentals (Months 1-3)',
@@ -253,6 +253,66 @@ const CAREER_PATHS: Record<string, CareerPath[]> = {
             }
           ],
           projects: ['SEO Campaign', 'Social Media Strategy', 'Google Ads Campaign']
+        }
+      ]
+    },
+    {
+      id: 'social-media-manager',
+      name: 'Social Media Manager',
+      description: 'Build brand presence and engage audiences across social platforms',
+      difficulty: 'beginner',
+      estimatedTime: '2-4 months',
+      skills: ['Social Media Strategy', 'Content Creation', 'Community Management', 'Analytics', 'Brand Management'],
+      salaryRange: '$35K - $65K',
+      growthPotential: 'high',
+      matchScore: 82,
+      learningPath: [
+        {
+          phase: 'Social Media Mastery (Months 1-2)',
+          duration: '2 months',
+          topics: ['Platform Strategy', 'Content Creation', 'Community Engagement', 'Social Analytics'],
+          courses: [
+            {
+              title: 'Social Media Marketing Specialization',
+              platform: 'coursera',
+              url: 'https://www.coursera.org/specializations/social-media-marketing',
+              rating: 4.6,
+              duration: '45 hours',
+              level: 'Beginner',
+              price: 'Free'
+            }
+          ],
+          projects: ['Social Media Content Calendar', 'Brand Community Growth', 'Engagement Campaign']
+        }
+      ]
+    },
+    {
+      id: 'content-marketing-specialist',
+      name: 'Content Marketing Specialist',
+      description: 'Create compelling content that drives customer engagement and conversions',
+      difficulty: 'beginner',
+      estimatedTime: '4-8 months',
+      skills: ['Content Strategy', 'Copywriting', 'SEO Writing', 'Email Marketing', 'Content Analytics'],
+      salaryRange: '$42K - $75K',
+      growthPotential: 'high',
+      matchScore: 80,
+      learningPath: [
+        {
+          phase: 'Content Strategy & Creation (Months 1-4)',
+          duration: '4 months',
+          topics: ['Content Strategy', 'SEO Writing', 'Email Marketing', 'Content Performance'],
+          courses: [
+            {
+              title: 'Content Marketing Strategy',
+              platform: 'udemy',
+              url: 'https://www.udemy.com/course/content-marketing-masterclass/',
+              rating: 4.6,
+              duration: '35 hours',
+              level: 'Beginner',
+              price: '$19.99'
+            }
+          ],
+          projects: ['Content Marketing Strategy', 'Blog Content Series', 'Email Marketing Campaign']
         }
       ]
     }
