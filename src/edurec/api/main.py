@@ -6,13 +6,15 @@ FastAPI backend for the educational recommendation system.
 import json
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from pathlib import Path
+import hashlib
 
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 # from ..models.hybrid import hybrid_recommend
@@ -137,6 +139,19 @@ interactions_df: Optional[pd.DataFrame] = None
 metrics_collector = get_metrics_collector()
 ab_test_manager = get_ab_test_manager()
 gamification_engine = GamificationEngine()
+
+# Simple in-memory cache for recommendations
+recommendation_cache = {}
+cache_ttl = int(os.getenv('CACHE_TTL', 300))  # Configurable TTL, default 5 minutes
+
+def get_cache_key(request_data: dict) -> str:
+    """Generate cache key from request data."""
+    cache_string = json.dumps(request_data, sort_keys=True)
+    return hashlib.md5(cache_string.encode()).hexdigest()
+
+def is_cache_valid(timestamp: datetime) -> bool:
+    """Check if cache entry is still valid."""
+    return (datetime.now() - timestamp).total_seconds() < cache_ttl
 
 # Paths for data and models
 DATA_DIR = Path("data")
@@ -323,6 +338,14 @@ async def get_interest_based_recommendations(request: InterestBasedRecommendatio
     """Get personalized course recommendations based on user interests."""
     if not models_loaded:
         raise HTTPException(status_code=503, detail="Models not loaded")
+    
+    # Check cache first for performance
+    cache_key = get_cache_key(request.model_dump())
+    if cache_key in recommendation_cache:
+        cache_entry = recommendation_cache[cache_key]
+        if is_cache_valid(cache_entry["timestamp"]):
+            print(f"Returning cached recommendations for key: {cache_key[:8]}...")
+            return cache_entry["data"]
     
     try:
         # Ensure minimum of 4 recommendations
@@ -589,6 +612,22 @@ async def get_interest_based_recommendations(request: InterestBasedRecommendatio
             )
         
         print(f"Generated {len(response)} interest-based recommendations")
+        
+        # Cache the results for better performance
+        recommendation_cache[cache_key] = {
+            "data": response,
+            "timestamp": datetime.now()
+        }
+        
+        # Clean old cache entries (simple cleanup)
+        current_time = datetime.now()
+        keys_to_remove = []
+        for key, entry in recommendation_cache.items():
+            if not is_cache_valid(entry["timestamp"]):
+                keys_to_remove.append(key)
+        for key in keys_to_remove:
+            del recommendation_cache[key]
+            
         return response
         
     except Exception as e:

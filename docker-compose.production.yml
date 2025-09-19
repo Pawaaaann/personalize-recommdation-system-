@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  edurec-app:
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+    ports:
+      - "5000:5000"
+    environment:
+      - FASTAPI_ENV=production
+      - PYTHONPATH=/app
+      - CACHE_TTL=300
+    volumes:
+      - ./data:/app/data:ro  # Read-only data mount
+      - frontend_dist:/app/frontend/dist
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Optional: Add nginx reverse proxy for production
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.production.conf:/etc/nginx/nginx.conf:ro
+      - frontend_dist:/usr/share/nginx/html:ro  # Serve frontend static files
+      - ./ssl:/etc/nginx/ssl:ro  # SSL certificates if available
+    depends_on:
+      - edurec-app
+    restart: unless-stopped
+
+volumes:
+  frontend_dist:
+
+networks:
+  default:
+    driver: bridge

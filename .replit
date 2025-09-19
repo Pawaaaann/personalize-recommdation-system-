@@ -40,6 +40,10 @@ localPort = 5001
 externalPort = 3001
 
 [[ports]]
+localPort = 35767
+externalPort = 5000
+
+[[ports]]
 localPort = 41797
 externalPort = 3003
 
@@ -57,5 +61,5 @@ externalPort = 3000
 
 [deployment]
 deploymentTarget = "autoscale"
-run = ["bash", "-c", "python -m uvicorn src.edurec.api.main:app --host localhost --port 8000 & cd frontend && npx vite preview --host 0.0.0.0 --port 5000"]
-build = ["bash", "-c", "cd frontend && npm ci && npm run build"]
+run = ["python", "-m", "uvicorn", "src.edurec.api.main:app", "--host", "0.0.0.0", "--port", "5000"]
+build = ["npm", "run", "build"]
